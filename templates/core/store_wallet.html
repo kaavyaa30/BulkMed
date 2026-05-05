@@ -1,0 +1,353 @@
+﻿{% extends "base.html" %}
+{% block title %}Wallet — {{ store.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .sw-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 56px; }
+  .wallet-hero { background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 50%,#0891b2 100%); border-radius:20px; padding:28px 32px; margin-bottom:24px; color:#fff; box-shadow:0 8px 32px rgba(15,23,42,.25); }
+  .wallet-hero h2 { font-size:1.5rem; font-weight:800; margin:0; }
+  .wallet-hero p  { color:rgba(255,255,255,.72); font-size:.875rem; margin:5px 0 0; }
+  .wbal     { font-size:2.8rem; font-weight:800; letter-spacing:-2px; color:#fff; margin-top:12px; }
+  .wbal-sub { font-size:.8rem; color:rgba(255,255,255,.65); margin-top:2px; }
+  .stat-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:24px; }
+  .stat-box { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:20px 22px; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .stat-box .slabel { font-size:.65rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:#9ca3af; margin-bottom:6px; }
+  .stat-box .sval   { font-size:1.6rem; font-weight:800; letter-spacing:-1px; }
+  .s-card { background:#fff; border:1px solid var(--gray-200); border-radius:var(--radius-lg); box-shadow:var(--shadow-sm); overflow:hidden; }
+  .s-head  { padding:14px 20px; background:#fff; border-bottom:1px solid var(--gray-200); display:flex; justify-content:space-between; align-items:center; }
+  .s-title { font-weight:700; font-size:.9rem; color:var(--gray-800); display:flex; align-items:center; gap:8px; }
+  .s-icon  { width:32px; height:32px; border-radius:var(--radius-sm); background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:.9rem; }
+  .f-table th { padding:10px 16px; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; font-weight:700; background:var(--gray-50); color:var(--gray-500); border-bottom:1px solid var(--gray-200); white-space:nowrap; }
+  .f-table td { padding:12px 16px; border-bottom:1px solid var(--gray-100); vertical-align:middle; font-size:.84rem; }
+  .f-table tbody tr:last-child td { border-bottom:none; }
+  .f-table tbody tr:hover { background:var(--gray-50); }
+
+  /* ── Fee breakdown card — neutral SaaS style ── */
+  .fee-breakdown-card { border:1px solid var(--gray-200); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .fee-breakdown-header { padding:12px 16px; background:var(--gray-50); border-bottom:1px solid var(--gray-200); }
+  .fee-breakdown-label { display:block; font-size:.62rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--gray-400); margin-bottom:2px; }
+  .fee-breakdown-title { font-size:.875rem; font-weight:700; color:var(--gray-800); }
+  .fee-breakdown-body { padding:4px 0; }
+  .fee-row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 16px; }
+  .fee-row + .fee-row { border-top:1px solid var(--gray-100); }
+  .fee-row-sep { border-top:1px solid var(--gray-200) !important; padding-top:11px; }
+  .fee-row-total { border-top:2px solid var(--gray-200) !important; padding-top:12px; padding-bottom:12px; background:var(--gray-50); }
+  .fee-row-name { font-size:.82rem; color:var(--gray-600); display:flex; flex-direction:column; gap:2px; }
+  .fee-row-sub { font-size:.7rem; color:var(--gray-400); padding-left:22px; }
+  .fee-row-value { font-size:.82rem; font-weight:600; color:var(--gray-800); white-space:nowrap; padding-left:12px; }
+  .fee-row-total .fee-row-name { font-size:.9rem; font-weight:700; color:var(--gray-800); }
+  .fee-breakdown-note { margin:0 16px 12px; padding:8px 12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:.72rem; color:var(--gray-500); display:flex; align-items:flex-start; gap:6px; }
+  .pill { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:99px; }
+  .pill-credit  { background:#dcfce7; color:#16a34a; }
+  .pill-debit   { background:#fef2f2; color:#dc2626; }
+  .pill-penalty { background:#fef3c7; color:#92400e; }
+  .pill-refund  { background:#dcfce7; color:#16a34a; }
+  .add-btn { background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.35); border-radius:10px; padding:9px 20px; font-size:.85rem; font-weight:700; color:#fff; cursor:pointer; transition:background .15s; margin-top:14px; }
+  .add-btn:hover { background:rgba(255,255,255,.25); }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'store_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'order_history' %}"><i class="bi bi-receipt me-1"></i>Orders</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="sw-page">
+<div class="container-fluid px-4" style="max-width:1100px;margin:0 auto;">
+
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+
+  <!-- Hero -->
+  <div class="wallet-hero">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px;">STORE WALLET</div>
+        <h2>{{ store.name }}</h2>
+        <p>Funds are used as escrow deposits when joining order pools.</p>
+        <div class="wbal">₹{{ store.wallet_balance|floatformat:2 }}</div>
+        <div class="wbal-sub"><i class="bi bi-arrow-up-short" style="color:#6ee7b7;"></i> Available balance</div>
+        <button class="add-btn" onclick="openAddFunds()">
+          <i class="bi bi-plus-circle me-1"></i> Add Funds
+        </button>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:.72rem;color:rgba(255,255,255,.65);margin-bottom:4px;">Escrow model</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#fff;">10% advance</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.55);">Deducted on pool join</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="slabel">Current Balance</div>
+      <div class="sval" style="color:#2563eb;">₹{{ store.wallet_balance|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Active Escrow</div>
+      <div class="sval" style="color:#d97706;">₹{{ active_escrow|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Total Deposited</div>
+      <div class="sval" style="color:#dc2626;">₹{{ total_deposited|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Total Refunded</div>
+      <div class="sval" style="color:#059669;">₹{{ total_refunded|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <!-- Transaction ledger -->
+  <div class="s-card">
+    <div class="s-head">
+      <div class="s-title">
+        <div class="s-icon"><i class="bi bi-journal-text"></i></div>
+        Transaction History
+      </div>
+      <span style="font-size:.75rem;color:var(--gray-400);">{{ transactions|length }} record{{ transactions|length|pluralize }}</span>
+    </div>
+    {% if transactions %}
+    <div class="table-responsive">
+      <table class="table mb-0 f-table" id="tbl-wallet-txns" data-paginate="5">
+        <thead>
+          <tr><th>Date</th><th>Type</th><th>Amount</th><th>Description</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr>
+            <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">{{ tx.date|date:"d M Y, H:i" }}</td>
+            <td>
+              {% if tx.type == 'credit' %}
+              <span class="pill pill-credit"><i class="bi bi-arrow-down-circle-fill"></i> Credit</span>
+              {% else %}
+              <span class="pill pill-debit"><i class="bi bi-arrow-up-circle-fill"></i> Debit</span>
+              {% endif %}
+            </td>
+            <td style="font-weight:800;{% if tx.type == 'credit' %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">
+              {% if tx.type == 'credit' %}+{% else %}-{% endif %}₹{{ tx.amount|floatformat:2 }}
+            </td>
+            <td style="font-size:.84rem;color:#374151;">{{ tx.description }}</td>
+            <td>
+              {% if tx.status == 'active' %}<span class="pill" style="background:#eff6ff;color:#2563eb;">Active</span>
+              {% elif tx.status == 'cancelled_free' %}<span class="pill" style="background:#f3f4f6;color:#6b7280;">Cancelled</span>
+              {% elif tx.status == 'cancelled_penalty' %}<span class="pill pill-penalty">Penalty</span>
+              {% elif tx.status == 'refund' %}<span class="pill pill-refund">Refunded</span>
+              {% else %}<span class="pill" style="background:#f3f4f6;color:#6b7280;">{{ tx.status }}</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 24px;color:#9ca3af;">
+      <div style="font-size:3rem;margin-bottom:12px;">💳</div>
+      <p style="font-size:.9rem;">No transactions yet. Add funds and join a pool to get started.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+
+<!-- ── Add Funds Modal ── -->
+<div class="modal fade" id="addFundsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:480px;">
+    <div class="modal-content" style="border-radius:16px;overflow:hidden;">
+      <div class="modal-header">
+        <h5 class="modal-title fw-700"><i class="bi bi-wallet2 me-2 text-primary"></i>Add Funds to Wallet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:28px;">
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:20px;">Funds are added instantly and can be used for pool orders.</p>
+
+        <!-- Amount input -->
+        <div class="mb-3">
+          <label style="font-size:.82rem;font-weight:600;color:#374151;margin-bottom:6px;display:block;">Top-up Amount (₹)</label>
+          <input type="number" id="topup-amount" class="form-control" placeholder="e.g. 500" min="1"
+                 style="font-size:1.1rem;font-weight:700;text-align:center;" oninput="updateTopupBreakdown()">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+          <button onclick="document.getElementById('topup-amount').value='500';updateTopupBreakdown();"
+                  style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹500</button>
+          <button onclick="document.getElementById('topup-amount').value='1000';updateTopupBreakdown();"
+                  style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹1000</button>
+          <button onclick="document.getElementById('topup-amount').value='2000';updateTopupBreakdown();"
+                  style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹2000</button>
+          <button onclick="document.getElementById('topup-amount').value='5000';updateTopupBreakdown();"
+                  style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹5000</button>
+        </div>
+
+        <!-- ── Fee Breakdown Table ── -->
+        <div id="topup-breakdown" style="display:none;margin-bottom:20px;">
+          <div class="fee-breakdown-card">
+            <div class="fee-breakdown-header">
+              <span class="fee-breakdown-label">Payment Summary</span>
+              <span class="fee-breakdown-title">Transparent Fee Breakdown</span>
+            </div>
+            <div class="fee-breakdown-body">
+              <div class="fee-row">
+                <span class="fee-row-name">
+                  <i class="bi bi-wallet2 me-2 text-primary"></i>Wallet Top-up Amount
+                </span>
+                <span class="fee-row-value">₹<span id="bd-subtotal">0.00</span></span>
+              </div>
+              <div class="fee-row">
+                <span class="fee-row-name">
+                  <i class="bi bi-truck me-2" style="color:var(--info);"></i>Estimated Logistics Charge
+                </span>
+                <span class="fee-row-value">₹<span id="bd-logistics">0.00</span></span>
+              </div>
+              <div class="fee-row fee-row-sep">
+                <span class="fee-row-name">
+                  <i class="bi bi-shield-lock me-2" style="color:var(--warning);"></i>Secure Payment Gateway Fee
+                  <span class="fee-row-sub">Razorpay — 2% of Amount</span>
+                </span>
+                <span class="fee-row-value" style="color:var(--warning);">₹<span id="bd-gateway">0.00</span></span>
+              </div>
+              <div class="fee-row">
+                <span class="fee-row-name">
+                  <i class="bi bi-receipt me-2" style="color:var(--gray-500);"></i>Taxes on Gateway Fee
+                  <span class="fee-row-sub">18% GST on Gateway Fee</span>
+                </span>
+                <span class="fee-row-value" style="color:var(--gray-600);">₹<span id="bd-gst">0.00</span></span>
+              </div>
+              <div class="fee-row fee-row-total">
+                <span class="fee-row-name">
+                  <i class="bi bi-check-circle-fill me-2 text-success"></i>Total Payable Amount
+                </span>
+                <span class="fee-row-value text-success" style="font-size:1rem;">₹<span id="bd-total">0.00</span></span>
+              </div>
+              <div class="fee-breakdown-note">
+                <i class="bi bi-info-circle me-1"></i>
+                ₹<span id="bd-subtotal-note">0.00</span> will be credited to your wallet.
+                Gateway fee &amp; GST are non-refundable transaction costs.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="topup-result" class="mb-3"></div>
+        <button onclick="initiatePayment()" class="btn btn-primary w-100" style="font-weight:700;padding:12px;font-size:.95rem;">
+          <i class="bi bi-credit-card me-2"></i>Pay with Razorpay
+        </button>
+        <p style="font-size:.72rem;color:#9ca3af;text-align:center;margin-top:8px;margin-bottom:0;">
+          Powered by Razorpay · UPI · Cards · Net Banking
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+const CSRF = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrftoken='))?.split('=')[1]||'';
+
+// ── Fee constants (mirrors services.py — single source of truth is the backend) ──
+const RAZORPAY_FEE_RATE = 0.02;   // 2%
+const GST_ON_FEE_RATE   = 0.18;   // 18% GST on gateway fee
+
+function computeBreakdown(baseAmount, logistics = 0) {
+  const base       = parseFloat(baseAmount) + parseFloat(logistics);
+  const gateway    = Math.round(base * RAZORPAY_FEE_RATE * 100) / 100;
+  const gst        = Math.round(gateway * GST_ON_FEE_RATE * 100) / 100;
+  const totalFee   = Math.round((gateway + gst) * 100) / 100;
+  const totalPayable = Math.round((base + totalFee) * 100) / 100;
+  return { subtotal: parseFloat(baseAmount), logistics, gateway, gst, totalFee, totalPayable };
+}
+
+function fmt(n) { return parseFloat(n).toFixed(2); }
+
+function updateTopupBreakdown() {
+  const amount = parseFloat(document.getElementById('topup-amount').value);
+  const bdEl   = document.getElementById('topup-breakdown');
+  if (!amount || amount < 1) { bdEl.style.display = 'none'; return; }
+
+  const bd = computeBreakdown(amount, 0);
+  document.getElementById('bd-subtotal').textContent      = fmt(bd.subtotal);
+  document.getElementById('bd-logistics').textContent     = fmt(bd.logistics);
+  document.getElementById('bd-gateway').textContent       = fmt(bd.gateway);
+  document.getElementById('bd-gst').textContent           = fmt(bd.gst);
+  document.getElementById('bd-total').textContent         = fmt(bd.totalPayable);
+  document.getElementById('bd-subtotal-note').textContent = fmt(bd.subtotal);
+  bdEl.style.display = 'block';
+}
+
+function openAddFunds() {
+  new bootstrap.Modal(document.getElementById('addFundsModal')).show();
+}
+
+async function initiatePayment() {
+  const amount  = parseInt(document.getElementById('topup-amount').value);
+  const resultEl = document.getElementById('topup-result');
+  if (!amount || amount < 1) {
+    resultEl.innerHTML = '<div class="alert alert-danger py-2">Please enter a valid amount.</div>';
+    return;
+  }
+
+  const res = await fetch('/wallet/create-order/', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body:    JSON.stringify({ amount }),
+  });
+  const order = await res.json();
+  if (!res.ok) {
+    resultEl.innerHTML = `<div class="alert alert-danger py-2">${order.error}</div>`;
+    return;
+  }
+
+  const rzp = new Razorpay({
+    key:         order.key_id,
+    amount:      order.amount,          // total_paise (includes fee)
+    currency:    order.currency,
+    order_id:    order.order_id,
+    name:        'BulkMed',
+    description: 'Wallet Top-up',
+    prefill:     { name: order.name, email: order.email, contact: order.contact },
+    theme:       { color: '#2563eb' },
+    handler: async function(response) {
+      const vRes = await fetch('/wallet/verify-payment/', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body:    JSON.stringify({
+          razorpay_order_id:   response.razorpay_order_id,
+          razorpay_payment_id: response.razorpay_payment_id,
+          razorpay_signature:  response.razorpay_signature,
+          amount:              order.amount,
+          base_amount:         amount,   // ← base rupees (no fee) to credit to wallet
+        }),
+      });
+      const vData = await vRes.json();
+      if (vData.ok) {
+        resultEl.innerHTML = `<div class="alert alert-success py-2">✅ ${vData.message}</div>`;
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        resultEl.innerHTML = `<div class="alert alert-danger py-2">❌ ${vData.error}</div>`;
+      }
+    },
+    modal: { ondismiss: () => { resultEl.innerHTML = ''; } },
+  });
+  rzp.open();
+}
+</script>
+{% endblock %}

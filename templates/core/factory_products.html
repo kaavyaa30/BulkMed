@@ -1,0 +1,194 @@
+﻿{% extends "base.html" %}
+{% block title %}Products — {{ factory.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fac-page{background:#f1f5f9;min-height:calc(100vh - 64px);padding:28px 0 56px;}
+  .page-hd{margin-bottom:24px;}
+  .page-hd h2{font-size:1.4rem;font-weight:800;color:#111827;letter-spacing:-.5px;margin:0;}
+  .page-hd p{color:#6b7280;font-size:.875rem;margin:4px 0 0;}
+  .s-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;margin-bottom:20px;}
+  .s-head{padding:14px 20px;display:flex;justify-content:space-between;align-items:center;}
+  .s-title{font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;}
+  .s-icon{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .f-table th{padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;background:#f0fdf4;color:#059669;border-bottom:2px solid #bbf7d0;white-space:nowrap;}
+  .f-table td{padding:12px 16px;border-bottom:1px solid #f3f4f6;vertical-align:middle;font-size:.84rem;}
+  .f-table tbody tr:last-child td{border-bottom:none;}
+  .f-table tbody tr:hover{background:#f9fafb;}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:99px;}
+  /* Form panel */
+  .form-panel{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:24px 28px;box-shadow:0 1px 4px rgba(0,0,0,.06);margin-bottom:24px;}
+  .form-panel h5{font-size:1rem;font-weight:700;color:#111827;margin-bottom:18px;display:flex;align-items:center;gap:8px;}
+  .form-label{font-size:.8rem;font-weight:600;color:#374151;margin-bottom:5px;}
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">🏭</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'factory_products' %}"><i class="bi bi-capsule me-1"></i>Products</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="fac-page">
+<div class="container-fluid px-4" style="max-width:1200px;margin:0 auto;">
+
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+
+  <div class="page-hd">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h2><i class="bi bi-capsule me-2" style="color:#059669;"></i>Product Catalog</h2>
+        <p>Medicines manufactured by {{ factory.name }} — scoped to your factory only.</p>
+      </div>
+      {% if not edit_id %}
+      <button class="btn btn-success btn-sm" onclick="document.getElementById('product-form-panel').scrollIntoView({behavior:'smooth'})">
+        <i class="bi bi-plus-circle me-1"></i>Add Product
+      </button>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Product list -->
+  <div class="s-card">
+    <div class="s-head" style="background:linear-gradient(135deg,#064e3b,#059669);">
+      <div class="s-title"><div class="s-icon"><i class="bi bi-capsule" style="color:#fff;"></i></div>Your Products</div>
+      <span style="font-size:.75rem;color:rgba(255,255,255,.75);">{{ products|length }} product{{ products|length|pluralize }}</span>
+    </div>
+    {% if products %}
+    <div class="table-responsive">
+      <table class="table mb-0 f-table" id="tbl-products" data-paginate="5">
+        <thead>
+          <tr>
+            <th>Name</th><th>Generic</th><th>SKU</th><th>Category</th>
+            <th>Base Price</th><th>Unit</th><th>Open Pools</th><th>Edit</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for product in products %}
+          <tr {% if edit_id == product.id|stringformat:"s" %}style="background:#f0fdf4;"{% endif %}>
+            <td style="font-weight:600;color:#111827;">{{ product.name }}</td>
+            <td style="color:#6b7280;">{{ product.generic_name|default:"—" }}</td>
+            <td><code style="font-size:.78rem;color:#059669;">{{ product.sku_code|default:"—" }}</code></td>
+            <td><span class="pill" style="background:#f3f4f6;color:#374151;">{{ product.get_category_display }}</span></td>
+            <td style="font-weight:600;">₹{{ product.base_price }}</td>
+            <td style="color:#6b7280;">{{ product.unit }}</td>
+            <td>
+              {% if product.open_pool_count > 0 %}
+              <span class="pill" style="background:#dcfce7;color:#16a34a;">{{ product.open_pool_count }} open</span>
+              {% else %}
+              <span style="color:#9ca3af;font-size:.78rem;">—</span>
+              {% endif %}
+            </td>
+            <td>
+              <a href="?edit={{ product.id }}" class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:4px 10px;">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 24px;color:#9ca3af;">
+      <div style="font-size:3rem;margin-bottom:12px;">💊</div>
+      <p style="font-size:.9rem;">No products yet. Add your first medicine below.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Create / Edit form -->
+  <div class="form-panel" id="product-form-panel">
+    <h5>
+      {% if instance %}
+      <i class="bi bi-pencil-square" style="color:#2563eb;"></i> Edit: {{ instance.name }}
+      {% else %}
+      <i class="bi bi-plus-circle" style="color:#059669;"></i> Add New Product
+      {% endif %}
+    </h5>
+
+    <form method="post" action="{% url 'factory_products' %}{% if edit_id %}?edit={{ edit_id }}{% endif %}">
+      {% csrf_token %}
+      {% if edit_id %}<input type="hidden" name="edit_id" value="{{ edit_id }}">{% endif %}
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Medicine Name *</label>
+          {{ form.name }}
+          {% if form.name.errors %}<div class="text-danger" style="font-size:.78rem;">{{ form.name.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Generic Name</label>
+          {{ form.generic_name }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">SKU Code</label>
+          {{ form.sku_code }}
+          {% if form.sku_code.errors %}<div class="text-danger" style="font-size:.78rem;">{{ form.sku_code.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">HSN Code</label>
+          {{ form.hsn_code }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Barcode</label>
+          {{ form.barcode }}
+          {% if form.barcode.errors %}<div class="text-danger" style="font-size:.78rem;">{{ form.barcode.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Category *</label>
+          {{ form.category }}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Base Price (₹) *</label>
+          {{ form.base_price }}
+          {% if form.base_price.errors %}<div class="text-danger" style="font-size:.78rem;">{{ form.base_price.errors.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Unit *</label>
+          {{ form.unit }}
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-success" style="font-weight:700;">
+          <i class="bi bi-check-circle me-1"></i>{% if instance %}Save Changes{% else %}Add Product{% endif %}
+        </button>
+        {% if edit_id %}
+        <a href="{% url 'factory_products' %}" class="btn btn-outline-secondary">Cancel</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+</div>
+</div>
+
+{% if edit_id %}
+<script>
+  // Auto-scroll to form when editing
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('product-form-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}Factory Directory — BulkMed{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Page header ── */
+  .fl-header {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%);
+    border-radius: var(--radius-lg);
+    padding: 24px 28px;
+    margin-bottom: 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .fl-header h2  { font-size: 1.4rem; font-weight: 800; color: #fff; margin: 0; letter-spacing: -.5px; }
+  .fl-header p   { color: rgba(255,255,255,.7); font-size: .82rem; margin: 4px 0 0; }
+  .fl-count-pill {
+    background: rgba(255,255,255,.15);
+    border: 1.5px solid rgba(255,255,255,.25);
+    border-radius: 99px;
+    padding: 6px 18px;
+    font-size: .82rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  /* ── Table card ── */
+  .fl-card {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .fl-card-header {
+    padding: 14px 20px;
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .fl-card-title {
+    font-weight: 700;
+    font-size: .9rem;
+    color: var(--gray-800);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── Table ── */
+  .fl-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+  .fl-table thead th {
+    padding: 10px 16px;
+    font-size: .68rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    font-weight: 700;
+    color: var(--gray-500);
+    background: var(--gray-50);
+    border-bottom: 1px solid var(--gray-200);
+    white-space: nowrap;
+  }
+  .fl-table tbody td {
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--gray-100);
+    vertical-align: middle;
+  }
+  .fl-table tbody tr:last-child td { border-bottom: none; }
+  .fl-table tbody tr:hover { background: var(--gray-50); }
+
+  /* ── Factory name cell ── */
+  .factory-avatar {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: var(--primary-light);
+    color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: .9rem;
+    flex-shrink: 0;
+  }
+
+  /* ── Username badge ── */
+  .username-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--primary-light);
+    color: var(--primary);
+    border: 1px solid #bfdbfe;
+    border-radius: 99px;
+    padding: 3px 12px;
+    font-size: .78rem;
+    font-weight: 700;
+    font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
+    letter-spacing: .2px;
+  }
+  .username-badge.no-user {
+    background: var(--gray-100);
+    color: var(--gray-400);
+    border-color: var(--gray-200);
+  }
+
+  /* ── Verified pill ── */
+  .verified-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: .7rem; font-weight: 600;
+    padding: 2px 9px; border-radius: 99px;
+  }
+  .verified-pill.yes { background: var(--success-light); color: var(--success); border: 1px solid #bbf7d0; }
+  .verified-pill.no  { background: var(--warning-light); color: var(--warning); border: 1px solid #fde68a; }
+
+  /* ── Product badges ── */
+  .product-badge {
+    display: inline-block;
+    background: var(--gray-100);
+    color: var(--gray-700);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: .72rem;
+    font-weight: 500;
+    margin: 2px 2px 2px 0;
+    white-space: nowrap;
+  }
+  .product-wrap { max-width: 340px; line-height: 1.8; }
+
+  /* ── Wallet amount ── */
+  .wallet-amt {
+    font-weight: 700;
+    color: var(--success);
+  }
+  .wallet-amt.zero { color: var(--gray-400); font-weight: 500; }
+
+  /* ── Empty state ── */
+  .fl-empty {
+    text-align: center;
+    padding: 56px 24px;
+    color: var(--gray-400);
+  }
+  .fl-empty .fl-empty-icon { font-size: 2.5rem; margin-bottom: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Page header ── #}
+<div class="fl-header">
+  <div>
+    <div style="font-size:.65rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px;">
+      CONTROL PANEL · STAFF ONLY
+    </div>
+    <h2>🏭 Factory Directory</h2>
+    <p>All registered factories with their login credentials and product catalogue.</p>
+  </div>
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <span class="fl-count-pill">
+      <i class="bi bi-building me-1"></i>{{ factory_count }} factory{{ factory_count|pluralize:"y,ies" }}
+    </span>
+    <a href="{% url 'control_panel' %}" class="btn btn-sm btn-outline-secondary"
+       style="background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.3);color:#fff;font-size:.78rem;">
+      <i class="bi bi-arrow-left me-1"></i>Control Panel
+    </a>
+  </div>
+</div>
+
+{# ── Main table card ── #}
+<div class="fl-card">
+  <div class="fl-card-header">
+    <div class="fl-card-title">
+      <i class="bi bi-table text-primary"></i>
+      Factory — Username — Products
+    </div>
+    <span style="font-size:.75rem;color:var(--gray-400);">
+      {{ factory_count }} record{{ factory_count|pluralize }}
+    </span>
+  </div>
+
+  {% if factories %}
+  <div class="table-responsive">
+    <table class="fl-table" id="tbl-factory-list" data-paginate="15">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Factory Name</th>
+          <th>Username</th>
+          <th>City</th>
+          <th>Products</th>
+          <th>Verified</th>
+          <th>Wallet Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for factory in factories %}
+        <tr>
+
+          {# ── Row number ── #}
+          <td style="color:var(--gray-400);font-size:.75rem;width:40px;">
+            {{ forloop.counter }}
+          </td>
+
+          {# ── Factory Name ── #}
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="factory-avatar">{{ factory.name|first|upper }}</div>
+              <div>
+                <div style="font-weight:700;color:var(--gray-900);font-size:.875rem;">
+                  {{ factory.name }}
+                </div>
+                {% if factory.license_no %}
+                <div style="font-size:.7rem;color:var(--gray-400);margin-top:1px;">
+                  <i class="bi bi-file-earmark-text me-1"></i>{{ factory.license_no }}
+                </div>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+
+          {# ── Username — highlighted badge ── #}
+          <td>
+            {% if factory.user %}
+              <span class="username-badge">
+                <i class="bi bi-person-fill"></i>{{ factory.user.username }}
+              </span>
+            {% else %}
+              <span class="username-badge no-user">
+                <i class="bi bi-person-dash"></i>No account
+              </span>
+            {% endif %}
+          </td>
+
+          {# ── City ── #}
+          <td>
+            {% if factory.city %}
+              <span style="font-size:.82rem;background:var(--gray-100);padding:2px 9px;border-radius:6px;color:var(--gray-700);">
+                <i class="bi bi-geo-alt me-1" style="color:var(--info);"></i>{{ factory.city }}
+              </span>
+            {% else %}
+              <span style="color:var(--gray-300);font-size:.8rem;">—</span>
+            {% endif %}
+          </td>
+
+          {# ── Products — comma-separated badges ── #}
+          <td>
+            {% with products=factory.products.all %}
+            {% if products %}
+              <div class="product-wrap">
+                {% for product in products %}
+                  <span class="product-badge">
+                    <i class="bi bi-capsule me-1" style="color:var(--primary);font-size:.65rem;"></i>{{ product.name }}
+                  </span>
+                {% endfor %}
+              </div>
+              <div style="font-size:.68rem;color:var(--gray-400);margin-top:4px;">
+                {{ products|length }} product{{ products|length|pluralize }}
+              </div>
+            {% else %}
+              <span style="color:var(--gray-300);font-size:.8rem;">No products linked</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+
+          {# ── Verified status ── #}
+          <td>
+            {% if factory.is_verified %}
+              <span class="verified-pill yes">
+                <i class="bi bi-patch-check-fill"></i> Verified
+              </span>
+            {% else %}
+              <span class="verified-pill no">
+                <i class="bi bi-clock"></i> Pending
+              </span>
+            {% endif %}
+          </td>
+
+          {# ── Wallet Balance ── #}
+          <td>
+            <span class="wallet-amt {% if factory.wallet_balance == 0 %}zero{% endif %}">
+              ₹{{ factory.wallet_balance|floatformat:2 }}
+            </span>
+          </td>
+
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  <div class="fl-empty">
+    <div class="fl-empty-icon">🏭</div>
+    <p style="font-weight:600;color:var(--gray-600);margin-bottom:4px;">No factories registered yet.</p>
+    <p style="font-size:.82rem;">Run the seed script or add factories via the Django admin.</p>
+  </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

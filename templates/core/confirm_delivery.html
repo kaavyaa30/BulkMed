@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}Confirm Delivery — BulkMed{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="page-header"><h2>Confirm Delivery</h2><p>Enter the OTP provided by the delivery agent to release payment.</p></div>
+    <div class="card">
+      <div class="card-body">
+        <table class="summary-table w-100 mb-4">
+          <tr><td>Medicine</td><td><strong>{{ delivery.pool.product.name }}</strong></td></tr>
+          <tr><td>Quantity</td><td>{{ delivery.quantity }}</td></tr>
+          <tr><td>Status</td><td>{{ delivery.get_status_display }}</td></tr>
+        </table>
+
+        {% if delivery.otp_verified %}
+          <div class="alert alert-success"><i class="bi bi-check-circle-fill me-2"></i>Delivery confirmed. Payment has been released to the factory.</div>
+        {% else %}
+          {% if delivery.dispute %}
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            <strong>Dispute raised.</strong> {{ delivery.dispute.reason|truncatechars:100 }}
+            <br><small class="text-muted">Status: {{ delivery.dispute.get_status_display }} · Raised {{ delivery.dispute.raised_at|date:"d M Y, H:i" }}</small>
+          </div>
+          {% else %}
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-4">
+              <label class="form-label">6-Digit OTP</label>
+              <input type="text" name="otp" class="form-control form-control-lg text-center"
+                     maxlength="6" placeholder="• • • • • •" autofocus
+                     style="letter-spacing:8px;font-size:1.5rem;font-weight:700;">
+            </div>
+            <button type="submit" class="btn btn-success w-100 btn-lg mb-3">
+              <i class="bi bi-shield-check me-2"></i>Confirm & Release Payment
+            </button>
+          </form>
+
+          <!-- Raise Dispute -->
+          <hr>
+          <p class="text-muted" style="font-size:.82rem;margin-bottom:10px;">
+            <i class="bi bi-exclamation-circle me-1"></i>Received damaged or incorrect goods?
+          </p>
+          <button class="btn btn-outline-danger w-100" type="button"
+            data-bs-toggle="collapse" data-bs-target="#disputeForm">
+            <i class="bi bi-flag me-2"></i>Raise a Dispute
+          </button>
+          <div class="collapse mt-3" id="disputeForm">
+            <div class="card card-body" style="background:#fff8f8;border-color:#fecaca;">
+              <form method="post" action="{% url 'raise_dispute' delivery.id %}" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label fw-bold">Describe the issue <span class="text-danger">*</span></label>
+                  <textarea name="reason" class="form-control" rows="3"
+                    placeholder="e.g. 3 strips were damaged, packaging was torn..." required></textarea>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label fw-bold">Upload Photo (optional)</label>
+                  <input type="file" name="photo" class="form-control" accept="image/*">
+                  <div class="form-text">A photo of the damaged goods helps resolve disputes faster.</div>
+                </div>
+                <button type="submit" class="btn btn-danger w-100">
+                  <i class="bi bi-flag-fill me-2"></i>Submit Dispute
+                </button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

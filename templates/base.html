@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}BulkMed{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  {% load static %}
+  <link href="{% static 'css/bulkmed.css' %}" rel="stylesheet">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% block full_page %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <div class="brand-icon">💊</div>
+      BulkMed
+    </a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        {% if user.is_authenticated %}
+          {% load core_tags %}
+          {% if user.is_superuser %}
+            {# ── Superadmin nav — clean, focused ── #}
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'map_view' %}active{% endif %}" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'control_panel' %}active{% endif %}" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+          {% elif user|is_factory_user %}
+            {# ── Factory nav ── #}
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_dashboard' %}active{% endif %}" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_order_list' %}active{% endif %}" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_deliveries' %}active{% endif %}" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_products' %}active{% endif %}" href="{% url 'factory_products' %}"><i class="bi bi-capsule me-1"></i>Products</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_wallet' %}active{% endif %}" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'factory_analytics' %}active{% endif %}" href="{% url 'factory_analytics' %}"><i class="bi bi-bar-chart me-1"></i>Analytics</a></li>
+          {% else %}
+            {# ── Store nav ── #}
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'map_view' %}active{% endif %}" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+          {% endif %}
+          {# ── Staff-only (non-superuser): Control Panel link ── #}
+          {% if user.is_staff and not user.is_superuser %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}?section=factory"><i class="bi bi-building me-1"></i>Factory</a></li>
+            <li class="nav-item"><a class="nav-link {% if request.resolver_match.url_name == 'control_panel' %}active{% endif %}" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+          {% endif %}
+          <li class="nav-item ms-2">
+            <form method="post" action="{% url 'logout' %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+            </form>
+          </li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="{% url 'login' %}"><i class="bi bi-box-arrow-in-right me-1"></i>Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'register' %}"><i class="bi bi-person-plus me-1"></i>Register</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="page-wrapper">
+  <div class="container">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+{% endblock %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- ── Real-time notification toast container ─────────────────────────── -->
+<div id="toast-container" aria-live="polite" aria-atomic="true"
+     style="position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:360px;"></div>
+
+<style>
+/* ── Toast styles ── */
+.bm-toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.14), 0 2px 8px rgba(0,0,0,.08);
+  min-width: 300px;
+  max-width: 360px;
+  cursor: pointer;
+  transform: translateX(120%);
+  opacity: 0;
+  transition: transform .35s cubic-bezier(.34,1.56,.64,1), opacity .25s ease;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+.bm-toast.show {
+  transform: translateX(0);
+  opacity: 1;
+}
+.bm-toast.hide {
+  transform: translateX(120%);
+  opacity: 0;
+}
+/* Left accent bar */
+.bm-toast::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+  border-radius: 14px 0 0 14px;
+}
+.bm-toast.type-order_accepted::before   { background: #059669; }
+.bm-toast.type-order_dispatched::before { background: #2563eb; }
+.bm-toast.type-delivery_otp::before     { background: #7c3aed; }
+.bm-toast.type-dispute_resolved::before { background: #d97706; }
+.bm-toast.type-payout_released::before  { background: #16a34a; }
+.bm-toast.type-pool_locked::before      { background: #0891b2; }
+.bm-toast.type-warning::before          { background: #f59e0b; }
+.bm-toast.type-error::before            { background: #dc2626; }
+.bm-toast.type-info::before,
+.bm-toast.type-connected::before        { background: #6b7280; }
+
+.bm-toast-icon {
+  width: 38px; height: 38px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.bm-toast.type-order_accepted   .bm-toast-icon { background: #f0fdf4; }
+.bm-toast.type-order_dispatched .bm-toast-icon { background: #eff6ff; }
+.bm-toast.type-delivery_otp     .bm-toast-icon { background: #f5f3ff; }
+.bm-toast.type-dispute_resolved .bm-toast-icon { background: #fffbeb; }
+.bm-toast.type-payout_released  .bm-toast-icon { background: #f0fdf4; }
+.bm-toast.type-pool_locked      .bm-toast-icon { background: #ecfeff; }
+.bm-toast.type-warning          .bm-toast-icon { background: #fffbeb; }
+.bm-toast.type-error            .bm-toast-icon { background: #fef2f2; }
+.bm-toast.type-info             .bm-toast-icon,
+.bm-toast.type-connected        .bm-toast-icon { background: #f3f4f6; }
+
+.bm-toast-body { flex: 1; min-width: 0; }
+.bm-toast-title {
+  font-weight: 700;
+  font-size: .875rem;
+  color: #111827;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bm-toast-msg {
+  font-size: .78rem;
+  color: #6b7280;
+  line-height: 1.45;
+}
+.bm-toast-close {
+  background: none; border: none; cursor: pointer;
+  color: #9ca3af; font-size: 1rem; padding: 0;
+  flex-shrink: 0; line-height: 1;
+  transition: color .15s;
+}
+.bm-toast-close:hover { color: #374151; }
+.bm-toast-progress {
+  position: absolute;
+  bottom: 0; left: 0;
+  height: 3px;
+  border-radius: 0 0 14px 14px;
+  transition: width linear;
+}
+.bm-toast.type-order_accepted   .bm-toast-progress { background: #059669; }
+.bm-toast.type-order_dispatched .bm-toast-progress { background: #2563eb; }
+.bm-toast.type-delivery_otp     .bm-toast-progress { background: #7c3aed; }
+.bm-toast.type-dispute_resolved .bm-toast-progress { background: #d97706; }
+.bm-toast.type-payout_released  .bm-toast-progress { background: #16a34a; }
+.bm-toast.type-pool_locked      .bm-toast-progress { background: #0891b2; }
+.bm-toast.type-warning          .bm-toast-progress { background: #f59e0b; }
+.bm-toast.type-error            .bm-toast-progress { background: #dc2626; }
+.bm-toast.type-info             .bm-toast-progress,
+.bm-toast.type-connected        .bm-toast-progress { background: #6b7280; }
+</style>
+
+<script>
+// ── Notification icons per type ────────────────────────────────────────────
+const NOTIF_ICONS = {
+  order_accepted:   '✅',
+  order_dispatched: '🚚',
+  delivery_otp:     '🔑',
+  dispute_resolved: '⚖️',
+  payout_released:  '💰',
+  pool_locked:      '🔒',
+  warning:          '⚠️',
+  error:            '❌',
+  info:             'ℹ️',
+  connected:        '🔔',
+};
+
+const TOAST_DURATION = 6000;  // ms before auto-dismiss
+
+function showToast({ notif_type = 'info', title = '', body = '', url = '' }) {
+  // Skip the silent "connected" ack — don't show a toast for it
+  if (notif_type === 'connected') return;
+
+  const container = document.getElementById('toast-container');
+  const icon      = NOTIF_ICONS[notif_type] || 'ℹ️';
+  const tag       = url ? 'a' : 'div';
+  const href      = url ? `href="${url}"` : '';
+
+  const toast = document.createElement(tag);
+  toast.className = `bm-toast type-${notif_type}`;
+  if (url) toast.href = url;
+  toast.innerHTML = `
+    <div class="bm-toast-icon">${icon}</div>
+    <div class="bm-toast-body">
+      <div class="bm-toast-title">${title}</div>
+      <div class="bm-toast-msg">${body}</div>
+    </div>
+    <button class="bm-toast-close" aria-label="Dismiss">✕</button>
+    <div class="bm-toast-progress" style="width:100%;"></div>
+  `;
+
+  // Dismiss on close button click
+  toast.querySelector('.bm-toast-close').addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dismissToast(toast);
+  });
+
+  container.appendChild(toast);
+
+  // Trigger slide-in on next frame
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => toast.classList.add('show'));
+  });
+
+  // Animated progress bar countdown
+  const bar = toast.querySelector('.bm-toast-progress');
+  bar.style.transition = `width ${TOAST_DURATION}ms linear`;
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { bar.style.width = '0%'; });
+  });
+
+  // Auto-dismiss
+  const timer = setTimeout(() => dismissToast(toast), TOAST_DURATION);
+  toast._timer = timer;
+}
+
+function dismissToast(toast) {
+  clearTimeout(toast._timer);
+  toast.classList.remove('show');
+  toast.classList.add('hide');
+  toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+}
+
+// ── WebSocket connection ───────────────────────────────────────────────────
+// Only connect for authenticated users (Django injects the user id below)
+{% if user.is_authenticated %}
+(function connectNotifications() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const wsUrl = `${proto}://${location.host}/ws/notifications/`;
+
+  let ws, reconnectDelay = 2000;
+  let permanentlyFailed = false;  // set true when server can't handle WS at all
+
+  function connect() {
+    if (permanentlyFailed) return;
+    ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      reconnectDelay = 2000;  // reset backoff on successful connect
+    };
+
+    ws.onmessage = event => {
+      try {
+        const data = JSON.parse(event.data);
+        showToast(data);
+      } catch (e) {
+        console.warn('[BulkMed WS] Bad message:', event.data);
+      }
+    };
+
+    ws.onclose = event => {
+      // 4001 = rejected by server (unauthenticated) — don't retry
+      if (event.code === 4001) return;
+
+      // Code 1006 with no prior onopen = server returned HTTP 404/400
+      // (runserver can't handle WebSockets). Stop retrying silently.
+      if (event.code === 1006 && reconnectDelay === 2000) {
+        // First attempt failed immediately — likely runserver, not Daphne
+        permanentlyFailed = true;
+        console.info('[BulkMed] WebSocket unavailable (runserver mode). Real-time notifications disabled.');
+        return;
+      }
+
+      // Exponential backoff reconnect (max 30s)
+      setTimeout(connect, reconnectDelay);
+      reconnectDelay = Math.min(reconnectDelay * 1.5, 30000);
+    };
+
+    ws.onerror = () => ws.close();
+  }
+
+  connect();
+
+  // Reconnect immediately when the tab becomes visible again
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && !permanentlyFailed && ws.readyState === WebSocket.CLOSED) connect();
+  });
+})();
+{% endif %}</script>
+<script>
+// ── Global table paginator ─────────────────────────────────────────────────
+// Usage: paginateTable('tableId', rowsPerPage)
+// Adds prev/next controls below any <table> with the given id.
+function paginateTable(tableId, perPage) {
+  perPage = perPage || 5;
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (rows.length <= perPage) return; // no pagination needed
+
+  let page = 1;
+  const totalPages = () => Math.ceil(rows.length / perPage);
+
+  function render() {
+    const start = (page - 1) * perPage;
+    rows.forEach((r, i) => r.style.display = (i >= start && i < start + perPage) ? '' : 'none');
+    ctrl.querySelector('.pg-info').textContent = `Page ${page} of ${totalPages()}`;
+    ctrl.querySelector('.pg-prev').disabled = page === 1;
+    ctrl.querySelector('.pg-next').disabled = page === totalPages();
+  }
+
+  // Build controls
+  const ctrl = document.createElement('div');
+  ctrl.style.cssText = 'display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 16px;background:#f9fafb;border-top:1px solid #e5e7eb;font-size:.78rem;';
+  ctrl.innerHTML = `
+    <span class="pg-info" style="color:#6b7280;font-weight:500;"></span>
+    <button class="pg-prev btn btn-sm btn-outline-secondary" style="padding:3px 10px;font-size:.75rem;">‹ Prev</button>
+    <button class="pg-next btn btn-sm btn-outline-secondary" style="padding:3px 10px;font-size:.75rem;">Next ›</button>`;
+  ctrl.querySelector('.pg-prev').onclick = () => { if (page > 1) { page--; render(); } };
+  ctrl.querySelector('.pg-next').onclick = () => { if (page < totalPages()) { page++; render(); } };
+
+  // Insert after the table's parent card or directly after table
+  const wrapper = table.closest('.table-responsive') || table.parentElement;
+  wrapper.parentElement.insertBefore(ctrl, wrapper.nextSibling);
+  render();
+}
+
+// Auto-paginate all tables with data-paginate attribute
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('table[data-paginate]').forEach(t => {
+    paginateTable(t.id, parseInt(t.dataset.paginate) || 10);
+  });
+});
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

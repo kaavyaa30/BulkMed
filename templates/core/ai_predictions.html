@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+{% block title %}AI Predictions — {{ store.name }}{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+        {% if user.is_staff %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        {% endif %}
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<style>
+  .ai-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 48px; }
+  .ai-hero { background:linear-gradient(135deg,#1c1917,#78350f,#d97706); border-radius:20px; padding:28px 32px; margin-bottom:24px; box-shadow:0 8px 32px rgba(217,119,6,.25); }
+  .ai-hero h1 { font-size:1.6rem; font-weight:800; color:#fff; margin:0; }
+  .ai-hero p { color:rgba(255,255,255,.75); font-size:.875rem; margin:6px 0 0; }
+  .back-btn { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3); border-radius:99px; padding:6px 16px; font-size:.78rem; font-weight:600; color:#fff; text-decoration:none; transition:background .15s; }
+  .back-btn:hover { background:rgba(255,255,255,.25); color:#fff; }
+  .season-badge { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3); border-radius:99px; padding:6px 16px; font-size:.8rem; font-weight:700; color:#fff; }
+
+  /* Season selector */
+  .season-selector-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:20px; }
+  .season-selector-head { background:linear-gradient(135deg,#1c1917,#d97706); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .season-selector-head-title { font-weight:700; font-size:.9rem; color:#fff; display:flex; align-items:center; gap:8px; }
+  .season-btns { display:flex; gap:14px; padding:24px 22px; flex-wrap:wrap; }
+  .season-btn { flex:1; min-width:180px; display:flex; align-items:center; gap:16px; padding:20px 24px; border-radius:14px; border:2px solid transparent; cursor:pointer; transition:all .2s; text-align:left; }
+  .season-btn-summer  { border-color:#fde68a; background:#fffbeb; }
+  .season-btn-monsoon { border-color:#a5f3fc; background:#ecfeff; }
+  .season-btn-winter  { border-color:#bfdbfe; background:#eff6ff; }
+  .season-btn-summer:hover,  .season-btn-summer.active  { background:#d97706; border-color:#d97706; box-shadow:0 6px 20px rgba(217,119,6,.3); }
+  .season-btn-monsoon:hover, .season-btn-monsoon.active { background:#0891b2; border-color:#0891b2; box-shadow:0 6px 20px rgba(8,145,178,.3); }
+  .season-btn-winter:hover,  .season-btn-winter.active  { background:#2563eb; border-color:#2563eb; box-shadow:0 6px 20px rgba(37,99,235,.3); }
+  .season-btn-summer:hover .sb-title,  .season-btn-summer.active .sb-title,
+  .season-btn-summer:hover .sb-sub,    .season-btn-summer.active .sb-sub  { color:#fff; }
+  .season-btn-monsoon:hover .sb-title, .season-btn-monsoon.active .sb-title,
+  .season-btn-monsoon:hover .sb-sub,   .season-btn-monsoon.active .sb-sub { color:#fff; }
+  .season-btn-winter:hover .sb-title,  .season-btn-winter.active .sb-title,
+  .season-btn-winter:hover .sb-sub,    .season-btn-winter.active .sb-sub  { color:#fff; }
+  .sb-icon { font-size:2rem; flex-shrink:0; }
+  .sb-title { font-weight:800; font-size:1.05rem; color:#111827; transition:color .2s; }
+  .sb-sub { font-size:.75rem; color:#6b7280; margin-top:3px; transition:color .2s; }
+
+  /* Forecast section */
+  .fc-section { display:none; }
+  .fc-section.visible { display:block; }
+  .fc-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:16px; }
+  .fc-head-summer  { background:linear-gradient(135deg,#78350f,#d97706); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .fc-head-monsoon { background:linear-gradient(135deg,#164e63,#0891b2); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .fc-head-winter  { background:linear-gradient(135deg,#1e3a8a,#6366f1); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .fc-head-title { font-weight:700; font-size:.9rem; color:#fff; display:flex; align-items:center; gap:8px; }
+  .fc-row { padding:16px 22px; border-bottom:1px solid #f3f4f6; display:flex; align-items:center; gap:14px; }
+  .fc-row:last-child { border-bottom:none; }
+  .fc-product { font-weight:700; font-size:.9rem; color:#111827; }
+  .fc-reason { font-size:.75rem; color:#6b7280; margin-top:3px; }
+  .fc-bar-wrap { flex:1; min-width:80px; }
+  .fc-bar { height:6px; border-radius:99px; background:#f3f4f6; overflow:hidden; margin-bottom:4px; }
+  .fc-bar-fill { height:100%; border-radius:99px; }
+  .fc-bar-ok     { background:linear-gradient(90deg,#34d399,#059669); }
+  .fc-bar-warn   { background:linear-gradient(90deg,#fbbf24,#f59e0b); }
+  .fc-bar-danger { background:linear-gradient(90deg,#f87171,#ef4444); }
+  .fc-mult { font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:99px; white-space:nowrap; }
+  .fc-mult-high { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+  .fc-mult-med  { background:#fffbeb; color:#d97706; border:1px solid #fde68a; }
+  .badge-ok   { font-size:.7rem; background:#f0fdf4; color:#16a34a; padding:4px 10px; border-radius:99px; font-weight:700; border:1px solid #bbf7d0; white-space:nowrap; }
+  .badge-no   { font-size:.7rem; background:#fef2f2; color:#dc2626; padding:4px 10px; border-radius:99px; font-weight:700; border:1px solid #fecaca; white-space:nowrap; }
+
+  /* No-selection placeholder */
+  .pick-prompt { text-align:center; padding:52px 24px; color:#9ca3af; }
+
+  /* Active alerts */
+  .alert-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); margin-bottom:20px; }
+  .alert-head { background:linear-gradient(135deg,#1c1917,#d97706); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .alert-head-title { font-weight:700; font-size:.9rem; color:#fff; display:flex; align-items:center; gap:8px; }
+  .alert-row { padding:14px 22px; border-bottom:1px solid #fffbeb; display:flex; align-items:center; gap:14px; }
+  .alert-row:last-child { border-bottom:none; }
+  .alert-num { width:28px; height:28px; border-radius:50%; border:1.5px solid #fde68a; display:flex; align-items:center; justify-content:center; font-size:.72rem; font-weight:700; color:#92400e; flex-shrink:0; background:#fef3c7; }
+</style>
+
+<!-- Embed all seasonal data for JS -->
+<script>
+  const SEASONAL_DATA = {{ all_entries_json|safe }};
+</script>
+
+<div class="ai-page">
+  <div class="container-fluid px-4" style="max-width:1000px;margin:0 auto;">
+
+    <!-- Hero -->
+    <div class="ai-hero">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <h1>🧠 AI Demand Predictions</h1>
+          <p>{{ store.name }} &nbsp;·&nbsp; Select a season to see which medicines will be in demand</p>
+          {% if active_season %}
+          <div class="mt-3">
+            <span class="season-badge">
+              {% if active_season == 'Monsoon' %}🌧️{% else %}❄️{% endif %}
+              {{ active_season }} season is currently active
+            </span>
+          </div>
+          {% endif %}
+        </div>
+        <a href="{% url 'dashboard' %}" class="back-btn"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Active Alerts -->
+    {% if alerts %}
+    <div class="alert-card">
+      <div class="alert-head">
+        <div class="alert-head-title">⚠️ Active Alerts
+          <span style="background:rgba(255,255,255,.2);border-radius:99px;padding:2px 10px;font-size:.72rem;">{{ alerts|length }}</span>
+        </div>
+        <span style="font-size:.72rem;color:rgba(255,255,255,.75);">Spike predicted by {{ spike_date }}</span>
+      </div>
+      {% for alert in alerts %}
+      <div class="alert-row" style="background:{% if not alert.is_read %}#fffdf5{% else %}#fff{% endif %};">
+        <div class="alert-num">{{ forloop.counter }}</div>
+        <div class="flex-fill">
+          <div style="font-weight:700;font-size:.9rem;color:#111827;">
+            {{ alert.product.name }}
+            {% if not alert.is_read %}<span style="font-size:.62rem;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #fde68a;margin-left:6px;">New</span>{% endif %}
+          </div>
+          <div style="font-size:.78rem;color:#6b7280;margin-top:3px;">{{ alert.reason }}</div>
+        </div>
+        <div class="d-flex flex-column gap-1 align-items-end me-2">
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e7eb;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:600;color:#374151;">
+            <i class="bi bi-calendar3"></i> {{ alert.demand_spike_date }}
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:600;color:#166534;">
+            <i class="bi bi-box"></i> Est. {{ alert.predicted_demand }} units
+          </span>
+        </div>
+        <a href="{% url 'pool_list' %}" class="btn btn-warning btn-sm" style="white-space:nowrap;border-radius:10px;padding:8px 16px;font-weight:700;font-size:.78rem;color:#1c1917;">Join Pool →</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Season Selector -->
+    <div class="season-selector-card">
+      <div class="season-selector-head">
+        <div class="season-selector-head-title"><i class="bi bi-stars"></i> Select a Season</div>
+        <span style="font-size:.72rem;color:rgba(255,255,255,.75);">Click to view demand forecast</span>
+      </div>
+      <div class="season-btns">
+        <button class="season-btn season-btn-summer{% if active_season == 'Summer' %} active{% endif %}" data-season="Summer">
+          <div class="sb-icon">☀️</div>
+          <div>
+            <div class="sb-title">Summer</div>
+            <div class="sb-sub">March – May &nbsp;·&nbsp; ORS, Eye Drops, Antihistamines</div>
+          </div>
+        </button>
+        <button class="season-btn season-btn-monsoon{% if active_season == 'Monsoon' %} active{% endif %}" data-season="Monsoon">
+          <div class="sb-icon">🌧️</div>
+          <div>
+            <div class="sb-title">Monsoon</div>
+            <div class="sb-sub">June – September &nbsp;·&nbsp; Fever, ORS, Antifungal</div>
+          </div>
+        </button>
+        <button class="season-btn season-btn-winter{% if active_season == 'Winter' %} active{% endif %}" data-season="Winter">
+          <div class="sb-icon">❄️</div>
+          <div>
+            <div class="sb-title">Winter</div>
+            <div class="sb-sub">November – February &nbsp;·&nbsp; Cough, Vitamin C, Antibiotics</div>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Forecast results (rendered by JS) -->
+    <div id="fc-placeholder" class="season-selector-card">
+      <div class="pick-prompt">
+        <div style="font-size:2.5rem;margin-bottom:12px;">☝️</div>
+        <div style="font-weight:700;font-size:1rem;color:#374151;margin-bottom:6px;">Select a season above</div>
+        <p style="font-size:.85rem;">Choose Monsoon or Winter to see which medicines will be in demand.</p>
+      </div>
+    </div>
+
+    <div id="fc-results" style="display:none;"></div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const seasonBtns = document.querySelectorAll('.season-btn');
+  const placeholder = document.getElementById('fc-placeholder');
+  const results = document.getElementById('fc-results');
+
+  function getSeasonStyle(season) {
+    if (season === 'Summer')  return { headClass: 'fc-head-summer',  emoji: '☀️', months: 'Mar – May', btnClass: 'btn-warning', btnStyle: 'color:#1c1917;' };
+    if (season === 'Monsoon') return { headClass: 'fc-head-monsoon', emoji: '🌧️', months: 'Jun – Sep', btnClass: 'btn-info',    btnStyle: 'color:#fff;' };
+    return                           { headClass: 'fc-head-winter',  emoji: '❄️', months: 'Nov – Feb', btnClass: 'btn-primary', btnStyle: '' };
+  }
+
+  function stockBar(current, predicted) {
+    if (current === null || predicted === null) return '';
+    const pct = Math.min(100, Math.round((current / predicted) * 100));
+    const cls = pct >= 80 ? 'fc-bar-ok' : pct >= 40 ? 'fc-bar-warn' : 'fc-bar-danger';
+    return `<div class="fc-bar-wrap">
+      <div class="fc-bar"><div class="fc-bar-fill ${cls}" style="width:${pct}%;"></div></div>
+      <div style="font-size:.7rem;color:#9ca3af;">${current} / ${predicted} units</div>
+    </div>`;
+  }
+
+  function actionBtn(entry) {
+    const s = getSeasonStyle(entry.season);
+    if (entry.pool_url) {
+      return `<a href="${entry.pool_url}" class="btn btn-sm ${s.btnClass}" style="border-radius:8px;font-size:.72rem;font-weight:700;white-space:nowrap;${s.btnStyle}">Order Now →</a>`;
+    }
+    return `<a href="/pools/" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;font-size:.72rem;font-weight:700;white-space:nowrap;">Browse Pools</a>`;
+  }
+
+  function renderSeason(seasonName) {
+    const entries = SEASONAL_DATA.filter(e => e.season === seasonName);
+    const s = getSeasonStyle(seasonName);
+
+    if (!entries.length) {
+      results.style.display = 'none';
+      placeholder.style.display = 'block';
+      placeholder.innerHTML = `<div class="pick-prompt">
+        <div style="font-size:2.5rem;margin-bottom:12px;">${s.emoji}</div>
+        <div style="font-weight:700;font-size:1rem;color:#374151;margin-bottom:6px;">No data for ${seasonName}</div>
+        <p style="font-size:.85rem;">No medicines found for this season yet.</p>
+      </div>`;
+      return;
+    }
+
+    let html = `<div class="fc-card">
+      <div class="${s.headClass}">
+        <div class="fc-head-title">${s.emoji} ${seasonName} Season &nbsp;<span style="font-size:.75rem;opacity:.8;">(${s.months})</span></div>
+        <span style="font-size:.72rem;color:rgba(255,255,255,.75);">${entries.length} medicine${entries.length > 1 ? 's' : ''} affected</span>
+      </div>`;
+
+    entries.forEach(e => {
+      const multCls = parseFloat(e.multiplier) >= 1.8 ? 'fc-mult-high' : 'fc-mult-med';
+      const stockBadge = e.current_stock !== null
+        ? (e.sufficient
+            ? '<span class="badge-ok">✓ Sufficient</span>'
+            : '<span class="badge-no">⚠ Restock</span>')
+        : '<span style="font-size:.7rem;background:#f3f4f6;color:#6b7280;padding:4px 10px;border-radius:99px;font-weight:600;border:1px solid #e5e7eb;white-space:nowrap;">Not in inventory</span>';
+
+      html += `<div class="fc-row">
+        <div class="flex-fill">
+          <div class="fc-product">${e.product_name}${e.generic ? ` <span style="font-size:.72rem;color:#9ca3af;font-weight:400;">(${e.generic})</span>` : ''}</div>
+          <div class="fc-reason">${e.reason}</div>
+        </div>
+        ${stockBar(e.current_stock, e.predicted_demand)}
+        <span class="fc-mult ${multCls}">${e.multiplier}× demand</span>
+        ${stockBadge}
+        ${actionBtn(e)}
+      </div>`;
+    });
+
+    html += '</div>';
+    placeholder.style.display = 'none';
+    results.innerHTML = html;
+    results.style.display = 'block';
+  }
+
+  seasonBtns.forEach(btn => {
+    btn.addEventListener('click', function () {
+      seasonBtns.forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      renderSeason(this.dataset.season);
+    });
+  });
+
+  // Auto-render active season on load
+  const activeBtn = document.querySelector('.season-btn.active');
+  if (activeBtn) renderSeason(activeBtn.dataset.season);
+})();
+</script>
+{% endblock %}
+

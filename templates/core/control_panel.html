@@ -1,0 +1,1565 @@
+{% extends 'base.html' %}
+{% block title %}Control Panel — BulkMed{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  .cp-header { background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 60%,#1d4ed8 100%); border-radius:16px; padding:24px 28px; color:#fff; margin-bottom:28px; display:flex; justify-content:space-between; align-items:center; }
+  .cp-header h2 { font-size:1.5rem; font-weight:800; letter-spacing:-.5px; margin:0; }
+  .cp-header p  { opacity:.7; margin:4px 0 0; font-size:.82rem; }
+  .cp-kpi { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:16px 18px; box-shadow:var(--shadow-sm); }
+  .cp-kpi .val { font-size:1.4rem; font-weight:800; letter-spacing:-.5px; line-height:1; }
+  .cp-kpi .lbl { font-size:.7rem; color:var(--gray-400); font-weight:500; margin-top:3px; }
+  .tab-bar { display:flex; gap:2px; background:var(--gray-100); border-radius:10px; padding:4px; margin-bottom:24px; flex-wrap:wrap; }
+  .tab-btn { flex:1; min-width:80px; padding:9px 10px; font-size:.78rem; font-weight:600; color:var(--gray-500); border:none; background:none; border-radius:8px; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:5px; }
+  .tab-btn:hover { color:var(--primary); background:rgba(37,99,235,.08); }
+  .tab-btn.active { background:#fff; color:var(--primary); box-shadow:var(--shadow-sm); }
+  .cp-panel { display:none; }
+  .cp-panel.active { display:block; }
+  .data-table { font-size:.82rem; }
+  .data-table th { padding:10px 16px; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; color:var(--gray-400); font-weight:600; background:var(--gray-50); border-bottom:1px solid var(--gray-200); }
+  .data-table td { padding:12px 16px; border-bottom:1px solid var(--gray-100); vertical-align:middle; }
+  .data-table tbody tr:last-child td { border-bottom:none; }
+  .data-table tbody tr:hover { background:var(--gray-50); }
+  .store-avatar { width:34px; height:34px; border-radius:10px; background:var(--primary-light); color:var(--primary); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.875rem; flex-shrink:0; }
+  .status-dot { width:7px; height:7px; border-radius:50%; display:inline-block; margin-right:5px; }
+  #track-map { height:400px; border-radius:12px; border:1px solid var(--gray-200); }
+  .stat-pill { background:#fff; border:1px solid var(--gray-200); border-radius:12px; padding:16px 18px; text-align:center; box-shadow:var(--shadow-sm); }
+  .stat-pill .value { font-size:1.6rem; font-weight:800; letter-spacing:-1px; line-height:1; }
+  .stat-pill .label { font-size:.7rem; color:var(--gray-400); font-weight:500; margin-top:4px; }
+  .pulse { display:inline-block; width:8px; height:8px; background:var(--success); border-radius:50%; animation:pulse 1.5s infinite; margin-right:5px; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(22,163,74,.5)} 70%{box-shadow:0 0 0 8px rgba(22,163,74,0)} 100%{box-shadow:0 0 0 0 rgba(22,163,74,0)} }
+  .panel-card { background:#fff; border:1px solid var(--gray-200); border-radius:14px; box-shadow:var(--shadow-sm); overflow:hidden; }
+  .panel-card-header { padding:14px 18px; border-bottom:1px solid var(--gray-100); font-weight:700; font-size:.875rem; color:var(--gray-700); display:flex; align-items:center; gap:8px; }
+  /* Drawer */
+  .drawer-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:1040; }
+  .drawer { display:none; position:fixed; top:0; right:0; height:100vh; width:440px; background:#fff; box-shadow:-8px 0 32px rgba(0,0,0,.12); z-index:1050; overflow-y:auto; border-left:1px solid var(--gray-200); }
+  .drawer-header { padding:18px 22px; border-bottom:1px solid var(--gray-100); display:flex; justify-content:space-between; align-items:center; }
+  .drawer-title { font-weight:700; font-size:1rem; }
+  .drawer-close { background:none; border:none; font-size:1.2rem; cursor:pointer; color:var(--gray-400); }
+  .drawer-body { padding:22px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cp-header">
+  <div><h2>⚙️ Control Panel</h2><p>Full system management — stores, products, pools, deliveries, orders</p></div>
+  <div class="d-flex align-items-center gap-3">
+    <div style="background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.25);border-radius:14px;padding:12px 20px;text-align:right;">
+      <div style="font-size:.62rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:4px;">Platform Wallet</div>
+      <div style="font-size:1.4rem;font-weight:800;color:#fff;letter-spacing:-1px;">₹{{ platform_wallet.balance }}</div>
+      <div style="font-size:.65rem;color:rgba(255,255,255,.55);margin-top:2px;">Total earned: ₹{{ platform_wallet.total_earned }}</div>
+    </div>
+    <button onclick="lockPools()" class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:.78rem;">
+      <i class="bi bi-lock me-1"></i>Lock Expired Pools
+    </button>
+  </div>
+</div>
+
+<!-- Section Switcher: Store / Factory -->
+<div class="d-flex gap-3 mb-4 align-items-center">
+  <div style="font-size:.8rem;font-weight:600;color:#6b7280;">View:</div>
+  <div style="display:flex;background:#f1f5f9;border-radius:12px;padding:4px;gap:2px;">
+    <button id="section-btn-store" onclick="switchSection('store')"
+      style="padding:8px 24px;border-radius:9px;border:none;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .15s;background:#fff;color:#2563eb;box-shadow:0 1px 4px rgba(0,0,0,.08);">
+      🏪 Store
+    </button>
+    <button id="section-btn-factory" onclick="switchSection('factory')"
+      style="padding:8px 24px;border-radius:9px;border:none;font-size:.85rem;font-weight:700;cursor:pointer;transition:all .15s;background:transparent;color:#6b7280;">
+      🏭 Factory
+    </button>
+  </div>
+</div>
+
+<!-- ══ STORE SECTION ══ -->
+<div id="section-store">
+
+<!-- Store KPIs -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val text-primary">{{ stores|length }}</div><div class="lbl">Total Stores</div></div></div>
+  <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val text-success">{{ products|length }}</div><div class="lbl">Products</div></div></div>
+  <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val" style="color:var(--warning);">{{ deliveries|length }}</div><div class="lbl">Deliveries</div></div></div>
+  <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val text-danger">{{ pools_all|length }}</div><div class="lbl">Order Pools</div></div></div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('stores',this)"><i class="bi bi-shop"></i>Stores</button>
+  <button class="tab-btn" onclick="switchTab('products',this)"><i class="bi bi-capsule"></i>Products</button>
+  <button class="tab-btn" onclick="switchTab('pools',this)"><i class="bi bi-collection"></i>Pools</button>
+  <button class="tab-btn" onclick="switchTab('orders',this)"><i class="bi bi-receipt"></i>Orders</button>
+  <button class="tab-btn" onclick="switchTab('deliveries',this)"><i class="bi bi-truck"></i>Deliveries</button>
+  <button class="tab-btn" onclick="switchTab('tracking',this)"><i class="bi bi-broadcast"></i>Live Tracking</button>
+  <button class="tab-btn" onclick="switchTab('passbook',this)"><i class="bi bi-journal-text"></i>Passbook</button>
+  <button class="tab-btn" onclick="switchTab('disputes',this)"><i class="bi bi-flag"></i>Disputes</button>
+</div>
+
+<!-- ══ TAB: STORES ══ -->
+<div class="cp-panel active" id="tab-stores">
+  <div class="panel-card">
+    <div class="panel-card-header">
+      <i class="bi bi-shop text-primary"></i> Registered Stores
+      <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ stores|length }} total</span>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table table mb-0" id="tbl-cp-stores" data-paginate="5">
+        <thead><tr><th>Store</th><th>City</th><th>License</th><th>Contact</th><th>Wallet</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for store in stores %}
+          <tr>
+            <td><div class="d-flex align-items-center gap-2">
+              <div class="store-avatar">{{ store.name|first }}</div>
+              <div><div style="font-weight:600;">{{ store.name }}</div><div style="font-size:.7rem;color:var(--gray-400);">{{ store.user.username }}</div></div>
+            </div></td>
+            <td><span style="font-size:.78rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ store.city }}</span></td>
+            <td><code style="font-size:.75rem;color:var(--primary);">{{ store.license_no }}</code></td>
+            <td style="color:var(--gray-600);">{{ store.contact }}</td>
+            <td style="font-weight:700;color:#16a34a;">₹{{ store.wallet_balance }}</td>
+            <td>
+              {% if store.is_verified %}
+                <span style="font-size:.72rem;background:#f0fdf4;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:600;border:1px solid #bbf7d0;">✓ Verified</span>
+              {% else %}
+                <form method="post" action="{% url 'verify_store' store.id %}" class="d-inline">{% csrf_token %}
+                  <button class="btn btn-sm" style="font-size:.72rem;padding:3px 10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">Verify</button>
+                </form>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openStoreEdit({{ store.id }},'{{ store.name|escapejs }}')"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteStore({{ store.id }},'{{ store.name|escapejs }}')"><i class="bi bi-trash"></i></button>
+              </div>
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No stores yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: PRODUCTS ══ -->
+<div class="cp-panel" id="tab-products">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-plus-circle text-success"></i> Add Product</div>
+        <div class="drawer-body">
+          <form id="product-create-form" onsubmit="submitProductForm(event,null)">
+            {% csrf_token %}
+            <div class="mb-2"><label class="form-label">Name</label><input name="name" class="form-control" required></div>
+            <div class="mb-2"><label class="form-label">Generic Name</label><input name="generic_name" class="form-control"></div>
+            <div class="row g-2 mb-2">
+              <div class="col-6"><label class="form-label">SKU Code</label><input name="sku_code" class="form-control" placeholder="e.g. DOLO-650" required></div>
+              <div class="col-6"><label class="form-label">HSN Code</label><input name="hsn_code" class="form-control" placeholder="e.g. 30049099"></div>
+            </div>
+            <div class="mb-2"><label class="form-label">Barcode</label><input name="barcode" class="form-control" placeholder="Optional"></div>
+            <div class="mb-2"><label class="form-label">Category</label>
+              <select name="category" class="form-control">
+                <option value="analgesic">Analgesic</option><option value="antibiotic">Antibiotic</option>
+                <option value="vitamin">Vitamin</option><option value="antiviral">Antiviral</option><option value="other">Other</option>
+              </select>
+            </div>
+            <div class="mb-2"><label class="form-label">Factory Name</label><input name="factory_name" class="form-control" required></div>
+            <div class="mb-2"><label class="form-label">Base Price (₹)</label><input name="base_price" type="number" step="0.01" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Unit</label><input name="unit" class="form-control" value="strip" required></div>
+            <div id="product-create-result" class="mb-2"></div>
+            <button type="submit" class="btn btn-success w-100">Add Product</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-capsule text-primary"></i> All Products <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ products|length }}</span></div>
+        <div class="table-responsive">
+          <table class="data-table table mb-0" id="tbl-cp-products" data-paginate="5">
+            <thead><tr><th>Name</th><th>SKU</th><th>HSN</th><th>Generic</th><th>Category</th><th>Factory</th><th>Price</th><th>Unit</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for p in products %}
+              <tr>
+                <td style="font-weight:600;">{{ p.name }}</td>
+                <td><code style="font-size:.72rem;color:var(--primary);">{{ p.sku_code }}</code></td>
+                <td style="font-size:.78rem;color:var(--gray-500);">{{ p.hsn_code }}</td>
+                <td style="color:var(--gray-500);">{{ p.generic_name }}</td>
+                <td><span style="font-size:.72rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ p.get_category_display }}</span></td>
+                <td style="font-size:.8rem;">{{ p.factory_name }}</td>
+                <td style="font-weight:700;color:#16a34a;">₹{{ p.base_price }}</td>
+                <td style="font-size:.8rem;">{{ p.unit }}</td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openProductEdit({{ p.id }})"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteProduct({{ p.id }},'{{ p.name|escapejs }}')"><i class="bi bi-trash"></i></button>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No products yet.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: POOLS ══ -->
+<div class="cp-panel" id="tab-pools">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-plus-circle text-success"></i> Create Pool</div>
+        <div class="drawer-body">
+          <form id="pool-create-form" onsubmit="submitPoolCreate(event)">
+            {% csrf_token %}
+            <div class="mb-2"><label class="form-label">Product</label>
+              <select name="product" class="form-control">
+                {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+              </select>
+            </div>
+            <div class="mb-2"><label class="form-label">City</label><input name="city" class="form-control" required></div>
+            <div class="mb-3"><label class="form-label">Pool Type</label>
+              <select name="mode" class="form-control">
+                <option value="urgent">⚡ Fast Track — 2-hour window, delivered in 24h</option>
+                <option value="pool" selected>⏳ Pool Mode — 3-day window, delivered in ~72h</option>
+              </select>
+            </div>
+            <div id="pool-create-result" class="mb-2"></div>
+            <button type="submit" class="btn btn-success w-100">Create Pool</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-collection text-primary"></i> All Pools <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ pools_all|length }}</span></div>
+        <div class="table-responsive">
+          <table class="data-table table mb-0" id="tbl-cp-pools" data-paginate="5">
+            <thead><tr><th>Product</th><th>City</th><th>Mode</th><th>Members</th><th>Discount</th><th>Status</th><th>Expires</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for pool in pools_all %}
+              <tr>
+                <td style="font-weight:600;">{{ pool.product.name }}</td>
+                <td><span style="font-size:.75rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ pool.city }}</span></td>
+                <td>
+                  {% if pool.pool_mode == 'urgent' %}
+                  <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;font-weight:600;">⚡ Fast Track</span>
+                  {% else %}
+                  <span style="font-size:.72rem;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-weight:600;">⏳ Pool Mode</span>
+                  {% endif %}
+                </td>
+                <td>{{ pool.current_member_count }}</td>
+                <td style="font-weight:700;color:#16a34a;">{{ pool.current_discount }}%</td>
+                <td>
+                  {% if pool.status == 'open' %}<span class="status-dot" style="background:#16a34a;"></span>
+                  {% elif pool.status == 'fulfilled' %}<span class="status-dot" style="background:#2563eb;"></span>
+                  {% else %}<span class="status-dot" style="background:#9ca3af;"></span>{% endif %}
+                  <span style="font-size:.78rem;">{{ pool.get_status_display }}</span>
+                </td>
+                <td style="font-size:.75rem;color:var(--gray-500);">{{ pool.expires_at|date:"d M, h:i A" }}</td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <a href="{% url 'pool_detail' pool.id %}" class="btn btn-sm btn-outline-primary" style="font-size:.72rem;">View</a>
+                    <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openPoolEdit('{{ pool.id }}','{{ pool.product.name|escapejs }}')"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deletePool('{{ pool.id }}','{{ pool.product.name|escapejs }}')"><i class="bi bi-trash"></i></button>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No pools yet.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: ORDERS ══ -->
+<div class="cp-panel" id="tab-orders">
+  <div class="panel-card">
+    <div class="panel-card-header"><i class="bi bi-receipt text-primary"></i> All Orders <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ orders_all|length }}</span></div>
+    <div class="table-responsive">
+      <table class="data-table table mb-0" id="tbl-cp-orders" data-paginate="5">
+        <thead><tr><th>Store</th><th>Medicine</th><th>Qty</th><th>Mode</th><th>Discount</th><th>Total</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for entry in orders_all %}
+          <tr>
+            <td style="font-weight:600;">{{ entry.store.name }}</td>
+            <td>{{ entry.pool.product.name }}</td>
+            <td>{{ entry.quantity }}</td>
+            <td><span style="font-size:.72rem;{% if entry.mode == 'urgent' %}background:#fef2f2;color:#dc2626;{% else %}background:#ede9fe;color:#7c3aed;{% endif %}padding:2px 8px;border-radius:99px;font-weight:600;">{{ entry.get_mode_display }}</span></td>
+            <td style="color:#16a34a;font-weight:700;">{{ entry.discount_applied }}%</td>
+            <td style="font-weight:700;">₹{{ entry.total_amount }}</td>
+            <td style="font-size:.75rem;color:var(--gray-500);">{{ entry.joined_at|date:"d M Y" }}</td>
+            <td>
+              {% if entry.status == 'active' %}<span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:6px;font-weight:600;">Active</span>
+              {% else %}<span style="font-size:.72rem;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:6px;font-weight:600;">{{ entry.get_status_display }}</span>{% endif %}
+            </td>
+            <td>
+              {% if entry.status == 'active' %}
+              <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="cancelOrder({{ entry.id }})">Cancel</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">No orders yet.</td></tr>{% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: DELIVERIES ══ -->
+<div class="cp-panel" id="tab-deliveries">
+  <div class="row g-4">
+    <div class="col-md-4">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-plus-circle text-primary"></i> Create Delivery</div>
+        <div class="drawer-body">
+          <form method="post" action="{% url 'create_delivery' %}">
+            {% csrf_token %}
+            <div class="mb-2"><label class="form-label">Order Pool</label>
+              <select name="pool_id" class="form-control">{% for pool in pools_all %}<option value="{{ pool.id }}">{{ pool.product.name }} — {{ pool.city }}</option>{% endfor %}</select>
+            </div>
+            <div class="mb-2"><label class="form-label">Store</label>
+              <select name="store_id" class="form-control">{% for store in stores %}<option value="{{ store.id }}">{{ store.name }}</option>{% endfor %}</select>
+            </div>
+            <div class="mb-2"><label class="form-label">Quantity</label><input type="number" name="quantity" class="form-control" value="50" min="1"></div>
+            <div class="mb-3"><label class="form-label">OTP</label><input type="text" name="otp" class="form-control" value="123456" maxlength="6"></div>
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-truck me-2"></i>Create & Dispatch</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="panel-card">
+        <div class="panel-card-header"><i class="bi bi-list-check text-primary"></i> All Deliveries</div>
+        <div class="table-responsive">
+          <table class="data-table table mb-0" id="tbl-cp-deliveries" data-paginate="5">
+            <thead><tr><th>ID</th><th>Product</th><th>Store</th><th>Status</th><th>OTP</th><th>Actions</th></tr></thead>
+            <tbody>
+              {% for d in deliveries %}
+              <tr>
+                <td><code style="font-size:.75rem;">#{{ d.id }}</code></td>
+                <td style="font-weight:600;">{{ d.pool.product.name }}</td>
+                <td style="color:var(--gray-600);">{{ d.store.name }}</td>
+                <td>
+                  {% if d.status == 'dispatched' %}<span class="status-dot" style="background:#2563eb;"></span>
+                  {% elif d.status == 'delivered' %}<span class="status-dot" style="background:#16a34a;"></span>
+                  {% else %}<span class="status-dot" style="background:#9ca3af;"></span>{% endif %}
+                  <span style="font-size:.78rem;">{{ d.get_status_display }}</span>
+                </td>
+                <td><code style="font-size:.75rem;color:var(--success);">{{ d.delivery_otp }}</code></td>
+                <td>
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-primary" style="font-size:.72rem;" onclick="loadTracking({{ d.id }})"><i class="bi bi-broadcast"></i> Track</button>
+                    {% if d.status != 'delivered' %}
+                    <button class="btn btn-sm btn-outline-warning" style="font-size:.72rem;" onclick="cancelDelivery({{ d.id }})">Cancel</button>
+                    {% endif %}
+                    <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteDelivery({{ d.id }})"><i class="bi bi-trash"></i></button>
+                  </div>
+                </td>
+              </tr>
+              {% empty %}<tr><td colspan="6" class="text-center text-muted py-4">No deliveries yet.</td></tr>{% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: LIVE TRACKING ══ -->
+<div class="cp-panel" id="tab-tracking">
+  <div class="d-flex gap-3 align-items-center mb-4">
+    <select id="track-delivery-select" class="form-control" style="max-width:360px;" onchange="startTracking()">
+      <option value="">— select a delivery —</option>
+      {% for d in deliveries %}<option value="{{ d.id }}">Delivery #{{ d.id }} — {{ d.pool.product.name }} → {{ d.store.name }}</option>{% endfor %}
+    </select>
+    <span id="track-status-badge" style="font-size:.78rem;background:var(--gray-100);color:var(--gray-500);padding:6px 14px;border-radius:99px;font-weight:600;">Select a delivery</span>
+  </div>
+  <div class="row g-3 mb-4">
+    <div class="col-4"><div class="stat-pill"><div class="value text-primary" id="t-eta">—</div><div class="label">ETA (minutes)</div></div></div>
+    <div class="col-4"><div class="stat-pill"><div class="value" style="color:var(--success);" id="t-dist">—</div><div class="label">Distance (km)</div></div></div>
+    <div class="col-4"><div class="stat-pill"><div class="value" style="color:var(--warning);" id="t-speed">—</div><div class="label">Speed (km/h)</div></div></div>
+  </div>
+  <div class="panel-card mb-4"><div style="padding:8px;"><div id="track-map"></div></div></div>
+  <div class="panel-card">
+    <div style="padding:14px 18px;">
+      <div class="d-flex justify-content-between mb-2" style="font-size:.78rem;color:var(--gray-500);">
+        <span>🏭 Factory</span><span id="t-progress-label">Select a delivery above</span><span id="t-store-name">🏪 Store</span>
+      </div>
+      <div class="progress" style="height:8px;"><div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" id="t-progress" style="width:0%"></div></div>
+      <p class="text-muted mt-2 mb-0" style="font-size:.72rem;"><span class="pulse"></span>Last: <span id="t-updated">—</span></p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TAB: PASSBOOK ══ -->
+<div class="cp-panel" id="tab-passbook">
+  <div class="panel-card">
+    <div class="panel-card-header">
+      <i class="bi bi-journal-text text-primary"></i> Platform Wallet — Transaction Ledger
+      <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">
+        Balance: ₹{{ platform_wallet.balance }} &nbsp;|&nbsp; Total Earned: ₹{{ platform_wallet.total_earned }}
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table table mb-0" id="tbl-passbook" data-paginate="5">
+        <thead>
+          <tr>
+            <th>Date & Time</th>
+            <th>Type</th>
+            <th>Amount</th>
+            <th>Description</th>
+            <th>Delivery</th>
+            <th>Store</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr>
+            <td style="font-size:.78rem;color:var(--gray-500);white-space:nowrap;">{{ tx.created_at|date:"d M Y, h:i A" }}</td>
+            <td>
+              {% if tx.transaction_type == 'credit' %}
+              <span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;border:1px solid #bbf7d0;">
+                <i class="bi bi-arrow-down-circle-fill me-1"></i>Credit
+              </span>
+              {% else %}
+              <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:99px;font-weight:700;border:1px solid #fecaca;">
+                <i class="bi bi-arrow-up-circle-fill me-1"></i>Debit
+              </span>
+              {% endif %}
+            </td>
+            <td style="font-weight:800;font-size:.95rem;{% if tx.transaction_type == 'credit' %}color:#16a34a;{% else %}color:#dc2626;{% endif %}">
+              {% if tx.transaction_type == 'credit' %}+{% else %}-{% endif %}₹{{ tx.amount }}
+            </td>
+            <td style="font-size:.82rem;color:var(--gray-700);">{{ tx.description }}</td>
+            <td>
+              {% if tx.delivery %}
+              <a href="{% url 'track_delivery' tx.delivery.id %}" style="font-size:.75rem;color:var(--primary);">
+                #{{ tx.delivery.id }}
+              </a>
+              {% else %}<span style="color:var(--gray-400);">—</span>{% endif %}
+            </td>
+            <td style="font-size:.8rem;">
+              {% if tx.delivery %}{{ tx.delivery.store.name }}{% else %}—{% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-5">No transactions yet. Commissions will appear here as deliveries are confirmed.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── TAB: DISPUTES ── -->
+<div class="cp-panel" id="tab-disputes">
+  <div class="panel-card">
+    <div class="panel-card-header" style="display:flex;justify-content:space-between;align-items:center;">
+      <span><i class="bi bi-flag text-danger"></i> Delivery Disputes</span>
+      <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:2px 10px;border-radius:99px;font-weight:600;">
+        {% for d in disputes %}{% if d.status == 'open' %}⚠️ {% endif %}{% endfor %}{{ disputes|length }} total
+      </span>
+    </div>
+    <div class="table-responsive">
+      <table class="data-table table mb-0" id="tbl-disputes" data-paginate="5">
+        <thead><tr><th>ID</th><th>Store</th><th>Medicine</th><th>Reason</th><th>Photo</th><th>Status</th><th>Raised</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for d in disputes %}
+          <tr>
+            <td><code style="font-size:.75rem;">#{{ d.id }}</code></td>
+            <td style="font-weight:600;">{{ d.delivery.store.name }}</td>
+            <td>{{ d.delivery.pool.product.name }}</td>
+            <td style="font-size:.82rem;max-width:200px;">{{ d.reason|truncatechars:80 }}</td>
+            <td>
+              {% if d.photo %}
+              <a href="{{ d.photo.url }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:3px 8px;">
+                <i class="bi bi-image"></i> View
+              </a>
+              {% else %}<span style="color:#d1d5db;font-size:.78rem;">—</span>{% endif %}
+            </td>
+            <td>
+              {% if d.status == 'open' %}
+                <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:99px;font-weight:700;">🔴 Open</span>
+              {% elif d.status == 'resolved_payout' %}
+                <span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;">✅ Payout Released</span>
+              {% else %}
+                <span style="font-size:.72rem;background:#eff6ff;color:#2563eb;padding:3px 10px;border-radius:99px;font-weight:700;">💰 Store Refunded</span>
+              {% endif %}
+            </td>
+            <td style="font-size:.75rem;color:var(--gray-500);">{{ d.raised_at|date:"d M Y, H:i" }}</td>
+            <td>
+              {% if d.status == 'open' %}
+              <div class="d-flex gap-1">
+                <button class="btn btn-sm btn-success" style="font-size:.72rem;padding:4px 10px;"
+                  onclick="resolveDispute({{ d.id }},'payout')">✅ Release Payout</button>
+                <button class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:4px 10px;"
+                  onclick="resolveDispute({{ d.id }},'refund')">💰 Refund Store</button>
+              </div>
+              {% else %}
+              <span style="font-size:.75rem;color:#9ca3af;">{{ d.admin_note|default:"—" }}</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted py-4">No disputes raised yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</div><!-- /section-store -->
+
+<!-- ══ FACTORY SECTION ══ -->
+<div id="section-factory" style="display:none;">
+
+  <!-- Factory KPIs -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val" style="color:#059669;">{{ factories|length }}</div><div class="lbl">Factories</div></div></div>
+    <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val text-primary">{{ factory_orders|length }}</div><div class="lbl">Factory Orders</div></div></div>
+    <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val" style="color:#d97706;">{{ factory_payouts|length }}</div><div class="lbl">Payout Records</div></div></div>
+    <div class="col-6 col-md-3"><div class="cp-kpi"><div class="val" style="color:#7c3aed;">{{ platform_wallet.total_earned }}</div><div class="lbl">Platform Earned (₹)</div></div></div>
+  </div>
+
+  <!-- Factory Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchFactoryTab('factories',this)"><i class="bi bi-building"></i>Factories</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-orders',this)"><i class="bi bi-box-seam"></i>Orders</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-payouts',this)"><i class="bi bi-wallet2"></i>Payouts</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-products',this)"><i class="bi bi-capsule"></i>Products</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-deliveries',this)"><i class="bi bi-truck"></i>Deliveries</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-pools',this)"><i class="bi bi-collection"></i>Pools</button>
+    <button class="tab-btn" onclick="switchFactoryTab('factory-withdrawals',this)"><i class="bi bi-arrow-up-circle"></i>Withdrawals</button>
+  </div>
+
+  <!-- ── Factory Tab: Factories ── -->
+  <div class="cp-panel active" id="tab-factories">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-building text-success"></i> Registered Factories
+        <span class="ms-auto" style="font-size:.72rem;background:#f0fdf4;color:#16a34a;padding:2px 10px;border-radius:99px;font-weight:600;">{{ factories|length }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factories" data-paginate="5">
+          <thead><tr><th>Factory</th><th>City</th><th>License</th><th>Contact</th><th>Wallet</th><th>Verified</th><th>User</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for f in factories %}
+            <tr>
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="store-avatar" style="background:#f0fdf4;color:#059669;">{{ f.name|first }}</div>
+                  <div><div style="font-weight:600;">{{ f.name }}</div><div style="font-size:.7rem;color:var(--gray-400);">{{ f.address|truncatechars:40 }}</div></div>
+                </div>
+              </td>
+              <td><span style="font-size:.78rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ f.city }}</span></td>
+              <td><code style="font-size:.75rem;color:#059669;">{{ f.license_no|default:"—" }}</code></td>
+              <td style="color:var(--gray-600);">{{ f.contact|default:"—" }}</td>
+              <td style="font-weight:700;color:#059669;">₹{{ f.wallet_balance }}</td>
+              <td>
+                {% if f.is_verified %}
+                  <span style="font-size:.72rem;background:#f0fdf4;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:600;border:1px solid #bbf7d0;">✓ Verified</span>
+                {% else %}
+                  <button class="btn btn-sm" style="font-size:.72rem;padding:3px 10px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;" onclick="verifyFactory({{ f.id }},'{{ f.name|escapejs }}')">Verify</button>
+                {% endif %}
+              </td>
+              <td style="font-size:.78rem;color:var(--gray-500);">{{ f.user.username|default:"No user" }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openFactoryEdit({{ f.id }},'{{ f.name|escapejs }}')"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteFactory({{ f.id }},'{{ f.name|escapejs }}')"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No factories registered yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Orders ── -->
+  <div class="cp-panel" id="tab-factory-orders">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-box-seam text-primary"></i> Factory Orders
+        <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ factory_orders|length }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factory-orders" data-paginate="5">
+          <thead><tr><th>ID</th><th>Factory</th><th>Medicine</th><th>City</th><th>Qty</th><th>Value</th><th>Net (85%)</th><th>Status</th><th>Received</th><th>Dispatched</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for fo in factory_orders %}
+            <tr>
+              <td style="color:#9ca3af;font-size:.75rem;">{{ fo.id }}</td>
+              <td style="font-weight:600;color:#059669;">{{ fo.factory.name }}</td>
+              <td style="font-weight:600;">{{ fo.pool.product.name }}</td>
+              <td><span style="font-size:.75rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ fo.pool.city }}</span></td>
+              <td>{{ fo.total_qty }}</td>
+              <td>₹{{ fo.total_value }}</td>
+              <td style="font-weight:700;color:#059669;">₹{{ fo.net_payout }}</td>
+              <td>
+                {% if fo.status == 'received' %}<span style="font-size:.72rem;background:#eff6ff;color:#2563eb;padding:3px 10px;border-radius:99px;font-weight:700;">📥 Received</span>
+                {% elif fo.status == 'processing' %}<span style="font-size:.72rem;background:#fffbeb;color:#d97706;padding:3px 10px;border-radius:99px;font-weight:700;">⚙️ Processing</span>
+                {% elif fo.status == 'dispatched' %}<span style="font-size:.72rem;background:#dbeafe;color:#1d4ed8;padding:3px 10px;border-radius:99px;font-weight:700;">🚚 Dispatched</span>
+                {% else %}<span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;">✅ Completed</span>{% endif %}
+              </td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ fo.received_at|date:"d M Y, H:i" }}</td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ fo.dispatched_at|date:"d M Y, H:i"|default:"—" }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openFactoryOrderEdit({{ fo.id }})"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteFactoryOrder({{ fo.id }})"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}<tr><td colspan="11" class="text-center text-muted py-4">No factory orders yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Payouts ── -->
+  <div class="cp-panel" id="tab-factory-payouts">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-wallet2" style="color:#d97706;"></i> Factory Payouts (85% Split)
+        <span class="ms-auto" style="font-size:.72rem;background:#fffbeb;color:#d97706;padding:2px 10px;border-radius:99px;font-weight:600;">{{ factory_payouts|length }} records</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factory-payouts" data-paginate="5">
+          <thead><tr><th>Date</th><th>Factory</th><th>Medicine</th><th>Store</th><th>Gross</th><th>Commission (15%)</th><th>Net (85%)</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for fp in factory_payouts %}
+            <tr>
+              <td style="font-size:.75rem;color:var(--gray-500);white-space:nowrap;">{{ fp.created_at|date:"d M Y, H:i" }}</td>
+              <td style="font-weight:600;color:#059669;">{{ fp.factory.name }}</td>
+              <td style="font-weight:600;">{{ fp.pool.product.name }}</td>
+              <td style="color:var(--gray-600);">{% if fp.delivery %}{{ fp.delivery.store.name }}{% else %}—{% endif %}</td>
+              <td>₹{{ fp.gross_amount }}</td>
+              <td style="color:#dc2626;">−₹{{ fp.commission_deducted }}</td>
+              <td style="font-weight:800;color:#059669;">₹{{ fp.net_payout }}</td>
+              <td>
+                {% if fp.status == 'paid' %}<span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;border:1px solid #bbf7d0;">✅ Paid</span>
+                {% else %}<span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:99px;font-weight:700;">⏳ Pending</span>{% endif %}
+              </td>
+              <td>
+                {% if fp.status == 'pending' %}
+                <button class="btn btn-sm" style="font-size:.72rem;background:#fffbeb;color:#d97706;border:1px solid #fde68a;font-weight:600;"
+                        onclick="toggleBreakdown({{ fp.id }})">
+                  <i class="bi bi-calculator me-1"></i>Breakdown
+                </button>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteFactoryPayout({{ fp.id }})"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+            {# ── Calculation Breakdown row (hidden by default, shown on click) ── #}
+            {% if fp.status == 'pending' %}
+            <tr id="breakdown-{{ fp.id }}" style="display:none;background:#fffbeb;">
+              <td colspan="9" style="padding:0;">
+                <div style="margin:0 16px 16px;border:1.5px solid #fde68a;border-radius:12px;overflow:hidden;">
+                  {# Header #}
+                  <div style="background:linear-gradient(135deg,#92400e,#d97706);padding:12px 18px;display:flex;justify-content:space-between;align-items:center;">
+                    <div style="font-weight:700;font-size:.85rem;color:#fff;display:flex;align-items:center;gap:8px;">
+                      <i class="bi bi-calculator"></i> Calculation Breakdown — {{ fp.pool.product.name }}
+                      {% if fp.delivery %}<span style="font-size:.72rem;opacity:.8;">→ {{ fp.delivery.store.name }}</span>{% endif %}
+                    </div>
+                    <span style="font-size:.7rem;color:rgba(255,255,255,.75);">Auto-releases after 48h dispute-free window</span>
+                  </div>
+                  {# Breakdown body #}
+                  <div style="padding:18px 20px;background:#fff;">
+                    <div style="display:flex;flex-direction:column;gap:0;max-width:420px;">
+                      {# Gross #}
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#f9fafb;border-radius:8px 8px 0 0;border:1px solid #e5e7eb;border-bottom:none;">
+                        <div>
+                          <div style="font-size:.78rem;font-weight:600;color:#374151;">Gross Pool Amount</div>
+                          <div style="font-size:.68rem;color:#9ca3af;margin-top:1px;">Full order value collected from store</div>
+                        </div>
+                        <div style="font-size:1.1rem;font-weight:800;color:#111827;letter-spacing:-.5px;">₹{{ fp.gross_amount }}</div>
+                      </div>
+                      {# Commission #}
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#fef2f2;border:1px solid #fecaca;border-bottom:none;">
+                        <div>
+                          <div style="font-size:.78rem;font-weight:600;color:#dc2626;">Platform Commission (15%)</div>
+                          <div style="font-size:.68rem;color:#9ca3af;margin-top:1px;">₹{{ fp.gross_amount }} × 15%</div>
+                        </div>
+                        <div style="font-size:1.1rem;font-weight:800;color:#dc2626;letter-spacing:-.5px;">−₹{{ fp.commission_deducted }}</div>
+                      </div>
+                      {# Net #}
+                      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f0fdf4;border:1.5px solid #10b981;border-radius:0 0 8px 8px;">
+                        <div>
+                          <div style="font-size:.82rem;font-weight:700;color:#065f46;">Net Factory Payout (85%)</div>
+                          <div style="font-size:.68rem;color:#6b7280;margin-top:1px;">₹{{ fp.gross_amount }} − ₹{{ fp.commission_deducted }}</div>
+                        </div>
+                        <div style="font-size:1.3rem;font-weight:800;color:#10b981;letter-spacing:-.5px;">₹{{ fp.net_payout }}</div>
+                      </div>
+                    </div>
+                    {# Pending notice #}
+                    <div style="margin-top:14px;padding:10px 14px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px;font-size:.75rem;color:#92400e;display:flex;align-items:center;gap:8px;">
+                      <i class="bi bi-clock-history" style="font-size:1rem;flex-shrink:0;"></i>
+                      <span>This payout is <strong>pending</strong>. It will be auto-released to <strong>{{ fp.factory.name }}</strong>'s wallet after the 48-hour dispute window passes from delivery confirmation.</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endif %}
+            {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">No payout records yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Products ── -->
+  <div class="cp-panel" id="tab-factory-products">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-capsule text-success"></i> Factory Products
+        <span class="ms-auto" style="font-size:.72rem;background:#f0fdf4;color:#16a34a;padding:2px 10px;border-radius:99px;font-weight:600;">{{ factory_products|length }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factory-products" data-paginate="5">
+          <thead><tr><th>Name</th><th>Factory</th><th>SKU</th><th>Category</th><th>Base Price</th><th>Unit</th><th>Open Pools</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for p in factory_products %}
+            <tr>
+              <td style="font-weight:600;">{{ p.name }}</td>
+              <td style="color:#059669;font-weight:600;">{{ p.factory.name }}</td>
+              <td><code style="font-size:.72rem;color:#059669;">{{ p.sku_code|default:"—" }}</code></td>
+              <td><span style="font-size:.72rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ p.get_category_display }}</span></td>
+              <td style="font-weight:700;color:#16a34a;">₹{{ p.base_price }}</td>
+              <td style="font-size:.8rem;">{{ p.unit }}</td>
+              <td>
+                {% with open_count=p.pools.filter|length %}
+                {% if open_count > 0 %}
+                <span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;">{{ open_count }} open</span>
+                {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+                {% endwith %}
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;" onclick="openFactoryProductEdit({{ p.id }})"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="deleteFactoryProduct({{ p.id }},'{{ p.name|escapejs }}')"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No factory products yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Deliveries ── -->
+  <div class="cp-panel" id="tab-factory-deliveries">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-truck text-primary"></i> Factory Deliveries
+        <span class="ms-auto" style="font-size:.72rem;background:var(--primary-light);color:var(--primary);padding:2px 10px;border-radius:99px;font-weight:600;">{{ factory_deliveries|length }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factory-deliveries" data-paginate="5">
+          <thead><tr><th>ID</th><th>Factory</th><th>Medicine</th><th>Store</th><th>Qty</th><th>Status</th><th>OTP</th><th>Dispatched</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for d in factory_deliveries %}
+            <tr>
+              <td><code style="font-size:.75rem;">#{{ d.id }}</code></td>
+              <td style="font-weight:600;color:#059669;">{{ d.pool.product.factory.name }}</td>
+              <td style="font-weight:600;">{{ d.pool.product.name }}</td>
+              <td style="color:var(--gray-600);">{{ d.store.name }}</td>
+              <td>{{ d.quantity }}</td>
+              <td>
+                {% if d.status == 'dispatched' %}<span class="status-dot" style="background:#2563eb;"></span>
+                {% elif d.status == 'delivered' %}<span class="status-dot" style="background:#16a34a;"></span>
+                {% else %}<span class="status-dot" style="background:#9ca3af;"></span>{% endif %}
+                <span style="font-size:.78rem;">{{ d.get_status_display }}</span>
+              </td>
+              <td><code style="font-size:.75rem;color:var(--success);">{{ d.delivery_otp }}</code></td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ d.dispatched_at|date:"d M Y, H:i"|default:"—" }}</td>
+              <td>
+                <div class="d-flex gap-1">
+                  {% if d.status != 'delivered' %}
+                  <button class="btn btn-sm btn-outline-warning" style="font-size:.72rem;" onclick="post('/control/factory-delivery/{{ d.id }}/cancel/',()=>{})">Cancel</button>
+                  {% endif %}
+                  <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;" onclick="post('/control/factory-delivery/{{ d.id }}/delete/',()=>{})"><i class="bi bi-trash"></i></button>
+                </div>
+              </td>
+            </tr>
+            {% empty %}<tr><td colspan="9" class="text-center text-muted py-4">No factory deliveries yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Pools ── -->
+  <div class="cp-panel" id="tab-factory-pools">
+    <div class="panel-card">
+      <div class="panel-card-header">
+        <i class="bi bi-collection" style="color:#7c3aed;"></i> Factory-Linked Pools
+        <span class="ms-auto" style="font-size:.72rem;background:#f5f3ff;color:#7c3aed;padding:2px 10px;border-radius:99px;font-weight:600;">{{ factory_pools|length }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-factory-pools" data-paginate="5">
+          <thead><tr><th>Medicine</th><th>Factory</th><th>City</th><th>Mode</th><th>Members</th><th>Discount</th><th>Status</th><th>Expires</th></tr></thead>
+          <tbody>
+            {% for pool in factory_pools %}
+            <tr>
+              <td style="font-weight:600;">{{ pool.product.name }}</td>
+              <td style="color:#059669;font-weight:600;">{{ pool.product.factory.name }}</td>
+              <td><span style="font-size:.75rem;background:var(--gray-100);padding:2px 8px;border-radius:6px;">{{ pool.city }}</span></td>
+              <td>
+                {% if pool.pool_mode == 'urgent' %}
+                <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;font-weight:600;">⚡ Fast Track</span>
+                {% else %}
+                <span style="font-size:.72rem;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-weight:600;">⏳ Pool Mode</span>
+                {% endif %}
+              </td>
+              <td>{{ pool.current_member_count }}</td>
+              <td style="font-weight:700;color:#16a34a;">{{ pool.current_discount }}%</td>
+              <td>
+                {% if pool.status == 'open' %}<span class="status-dot" style="background:#16a34a;"></span>
+                {% elif pool.status == 'fulfilled' %}<span class="status-dot" style="background:#2563eb;"></span>
+                {% else %}<span class="status-dot" style="background:#9ca3af;"></span>{% endif %}
+                <span style="font-size:.78rem;">{{ pool.get_status_display }}</span>
+              </td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ pool.expires_at|date:"d M, h:i A" }}</td>
+            </tr>
+            {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No factory-linked pools yet.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Factory Tab: Withdrawals ── -->
+  <div class="cp-panel" id="tab-factory-withdrawals">
+    <div class="panel-card">
+      <div class="panel-card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <span><i class="bi bi-arrow-up-circle" style="color:#d97706;"></i> Factory Withdrawal Requests</span>
+        <span style="font-size:.72rem;background:#fffbeb;color:#d97706;padding:2px 10px;border-radius:99px;font-weight:600;" id="pending-withdrawal-count"></span>
+      </div>
+      <div class="table-responsive">
+        <table class="data-table table mb-0" id="tbl-withdrawals" data-paginate="5">
+          <thead><tr><th>Factory</th><th>Amount</th><th>Status</th><th>Requested</th><th>Resolved</th><th>Admin Note</th><th>Actions</th></tr></thead>
+          <tbody>
+            {% for wr in withdrawal_requests %}
+            <tr>
+              <td style="font-weight:600;color:#059669;">{{ wr.factory.name }}</td>
+              <td style="font-weight:700;color:#111827;">₹{{ wr.amount }}</td>
+              <td>
+                {% if wr.status == 'pending' %}
+                  <span style="font-size:.72rem;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:99px;font-weight:700;">⏳ Pending</span>
+                {% elif wr.status == 'approved' %}
+                  <span style="font-size:.72rem;background:#dcfce7;color:#16a34a;padding:3px 10px;border-radius:99px;font-weight:700;">✅ Approved</span>
+                {% else %}
+                  <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:99px;font-weight:700;">❌ Rejected</span>
+                {% endif %}
+              </td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ wr.requested_at|date:"d M Y, H:i" }}</td>
+              <td style="font-size:.75rem;color:var(--gray-500);">{{ wr.resolved_at|date:"d M Y, H:i"|default:"—" }}</td>
+              <td style="font-size:.78rem;color:var(--gray-500);">{{ wr.admin_note|default:"—" }}</td>
+              <td>
+                {% if wr.status == 'pending' %}
+                <div class="d-flex gap-1">
+                  <button class="btn btn-sm btn-success" style="font-size:.72rem;padding:4px 10px;"
+                    onclick="withdrawalAction({{ wr.id }},'approve')">✅ Approve</button>
+                  <button class="btn btn-sm btn-outline-danger" style="font-size:.72rem;padding:4px 10px;"
+                    onclick="withdrawalAction({{ wr.id }},'reject')">❌ Reject</button>
+                </div>
+                {% else %}
+                <span style="color:#d1d5db;font-size:.78rem;">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No withdrawal requests yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /section-factory -->
+
+<!-- ══ DRAWERS ══ -->
+
+<!-- Factory Edit Drawer -->
+<div id="factory-drawer-overlay" class="drawer-overlay" onclick="closeFactoryEdit()"></div>
+<div id="factory-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Factory</div><div style="font-size:.75rem;color:var(--gray-400);" id="factory-drawer-subtitle"></div></div>
+    <button class="drawer-close" onclick="closeFactoryEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div id="factory-drawer-loading" class="text-center py-4 text-muted">Loading...</div>
+    <form id="factory-edit-form" style="display:none;" onsubmit="submitFactoryEdit(event)">
+      <input type="hidden" id="edit-factory-id">
+      <div class="mb-2"><label class="form-label">Name</label><input id="edit-factory-name" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Address</label><textarea id="edit-factory-address" class="form-control" rows="2"></textarea></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">License No</label><input id="edit-factory-license" class="form-control"></div>
+        <div class="col-6"><label class="form-label">Contact</label><input id="edit-factory-contact" class="form-control"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">City</label><input id="edit-factory-city" class="form-control"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">Latitude</label><input type="number" id="edit-factory-lat" class="form-control" step="0.000001"></div>
+        <div class="col-6"><label class="form-label">Longitude</label><input type="number" id="edit-factory-lng" class="form-control" step="0.000001"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">Wallet Balance (₹)</label><input type="number" id="edit-factory-wallet" class="form-control" step="0.01"></div>
+      <div class="mb-3"><div class="form-check"><input type="checkbox" id="edit-factory-verified" class="form-check-input"><label class="form-check-label" for="edit-factory-verified">Verified</label></div></div>
+      <div class="mb-3"><label class="form-label">GSTIN</label><input id="edit-factory-gstin" class="form-control" maxlength="15" placeholder="e.g. 24AABCU9603R1ZX"></div>
+      <div id="factory-drawer-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-success flex-fill">Save</button><button type="button" onclick="closeFactoryEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Factory Order Edit Drawer -->
+<div id="factory-order-drawer-overlay" class="drawer-overlay" onclick="closeFactoryOrderEdit()"></div>
+<div id="factory-order-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Factory Order</div><div style="font-size:.75rem;color:var(--gray-400);" id="factory-order-drawer-subtitle"></div></div>
+    <button class="drawer-close" onclick="closeFactoryOrderEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <form id="factory-order-edit-form" onsubmit="submitFactoryOrderEdit(event)">
+      <input type="hidden" id="edit-fo-id">
+      <div class="mb-3">
+        <label class="form-label">Status</label>
+        <select id="edit-fo-status" class="form-control">
+          <option value="received">📥 Order Received</option>
+          <option value="processing">⚙️ Processing</option>
+          <option value="dispatched">🚚 Dispatched</option>
+          <option value="completed">✅ Completed</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Notes (optional)</label>
+        <textarea id="edit-fo-notes" class="form-control" rows="3" placeholder="e.g. Partial stock, substitution notice..."></textarea>
+      </div>
+      <div id="factory-order-drawer-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-primary flex-fill">Save</button><button type="button" onclick="closeFactoryOrderEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Factory Product Edit Drawer -->
+<div id="factory-product-drawer-overlay" class="drawer-overlay" onclick="closeFactoryProductEdit()"></div>
+<div id="factory-product-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Factory Product</div></div>
+    <button class="drawer-close" onclick="closeFactoryProductEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <form id="factory-product-edit-form" onsubmit="submitFactoryProductForm(event, document.getElementById('edit-fp-id').value)">
+      <input type="hidden" id="edit-fp-id">
+      <div class="mb-2"><label class="form-label">Name</label><input id="edit-fp-name" name="name" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Generic Name</label><input id="edit-fp-generic" name="generic_name" class="form-control"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">SKU Code</label><input id="edit-fp-sku" name="sku_code" class="form-control"></div>
+        <div class="col-6"><label class="form-label">HSN Code</label><input id="edit-fp-hsn" name="hsn_code" class="form-control"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">Barcode</label><input id="edit-fp-barcode" name="barcode" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Category</label>
+        <select id="edit-fp-category" name="category" class="form-control">
+          <option value="analgesic">Analgesic</option><option value="antibiotic">Antibiotic</option>
+          <option value="vitamin">Vitamin</option><option value="antiviral">Antiviral</option><option value="other">Other</option>
+        </select>
+      </div>
+      <div class="mb-2"><label class="form-label">Factory</label>
+        <select id="edit-fp-factory" name="factory_id" class="form-control">
+          {% for f in factories %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="mb-2"><label class="form-label">Base Price (₹)</label><input id="edit-fp-price" name="base_price" type="number" step="0.01" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Unit</label><input id="edit-fp-unit" name="unit" class="form-control"></div>
+      <div id="factory-product-edit-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-success flex-fill">Save</button><button type="button" onclick="closeFactoryProductEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Store Edit Drawer -->
+<div id="store-drawer-overlay" class="drawer-overlay" onclick="closeStoreEdit()"></div>
+<div id="store-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Store</div><div style="font-size:.75rem;color:var(--gray-400);" id="store-drawer-subtitle"></div></div>
+    <button class="drawer-close" onclick="closeStoreEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div id="store-drawer-loading" class="text-center py-4 text-muted">Loading...</div>
+    <form id="store-edit-form" style="display:none;" onsubmit="submitStoreEdit(event)">
+      <input type="hidden" id="edit-store-id">
+      <div class="mb-2"><label class="form-label">Name</label><input id="edit-store-name" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Address</label><textarea id="edit-store-address" class="form-control" rows="2"></textarea></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">License</label><input id="edit-store-license" class="form-control"></div>
+        <div class="col-6"><label class="form-label">Contact</label><input id="edit-store-contact" class="form-control"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">City</label><input id="edit-store-city" class="form-control"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">Latitude</label><input type="number" id="edit-store-lat" class="form-control" step="0.000001"></div>
+        <div class="col-6"><label class="form-label">Longitude</label><input type="number" id="edit-store-lng" class="form-control" step="0.000001"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">Wallet (₹)</label><input type="number" id="edit-store-wallet" class="form-control" step="0.01"></div>
+      <div class="mb-3"><div class="form-check"><input type="checkbox" id="edit-store-verified" class="form-check-input"><label class="form-check-label" for="edit-store-verified">Verified</label></div></div>
+      <div class="mb-3"><label class="form-label">GSTIN</label><input id="edit-store-gstin" class="form-control" maxlength="15" placeholder="e.g. 27AAPFU0939F1ZV"></div>
+      <div id="store-drawer-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-primary flex-fill">Save</button><button type="button" onclick="closeStoreEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Pool Edit Drawer -->
+<div id="pool-drawer-overlay" class="drawer-overlay" onclick="closePoolEdit()"></div>
+<div id="pool-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Pool</div><div style="font-size:.75rem;color:var(--gray-400);" id="drawer-subtitle"></div></div>
+    <button class="drawer-close" onclick="closePoolEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <div id="drawer-loading" class="text-center py-4 text-muted">Loading...</div>
+    <form id="pool-edit-form" style="display:none;" onsubmit="submitPoolEdit(event)">
+      <input type="hidden" id="edit-pool-id">
+      <div class="mb-2"><label class="form-label">City</label><input id="edit-city" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Status</label>
+        <select id="edit-status" class="form-control">
+          <option value="open">Open</option><option value="locked">Locked</option>
+          <option value="fulfilled">Fulfilled</option><option value="cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="mb-3"><label class="form-label">Expires At</label><input type="datetime-local" id="edit-expires" class="form-control"></div>
+      <div class="mb-3 p-3" style="background:var(--gray-50);border-radius:10px;font-size:.8rem;">
+        <div class="d-flex justify-content-between mb-1"><span class="text-muted">Members</span><strong id="info-members">—</strong></div>
+        <div class="d-flex justify-content-between"><span class="text-muted">Total Qty</span><strong id="info-qty">—</strong></div>
+      </div>
+      <div id="drawer-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-primary flex-fill">Save</button><button type="button" onclick="closePoolEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Product Edit Drawer -->
+<div id="product-drawer-overlay" class="drawer-overlay" onclick="closeProductEdit()"></div>
+<div id="product-drawer" class="drawer">
+  <div class="drawer-header">
+    <div><div class="drawer-title">Edit Product</div></div>
+    <button class="drawer-close" onclick="closeProductEdit()">✕</button>
+  </div>
+  <div class="drawer-body">
+    <form id="product-edit-form" onsubmit="submitProductForm(event, document.getElementById('edit-product-id').value)">
+      <input type="hidden" id="edit-product-id">
+      <div class="mb-2"><label class="form-label">Name</label><input id="edit-product-name" name="name" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Generic Name</label><input id="edit-product-generic" name="generic_name" class="form-control"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label">SKU Code</label><input id="edit-product-sku" name="sku_code" class="form-control"></div>
+        <div class="col-6"><label class="form-label">HSN Code</label><input id="edit-product-hsn" name="hsn_code" class="form-control"></div>
+      </div>
+      <div class="mb-2"><label class="form-label">Barcode</label><input id="edit-product-barcode" name="barcode" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Category</label>
+        <select id="edit-product-category" name="category" class="form-control">
+          <option value="analgesic">Analgesic</option><option value="antibiotic">Antibiotic</option>
+          <option value="vitamin">Vitamin</option><option value="antiviral">Antiviral</option><option value="other">Other</option>
+        </select>
+      </div>
+      <div class="mb-2"><label class="form-label">Factory Name</label><input id="edit-product-factory" name="factory_name" class="form-control"></div>
+      <div class="mb-2"><label class="form-label">Base Price (₹)</label><input id="edit-product-price" name="base_price" type="number" step="0.01" class="form-control"></div>
+      <div class="mb-3"><label class="form-label">Unit</label><input id="edit-product-unit" name="unit" class="form-control"></div>
+      <div id="product-edit-result" class="mb-2"></div>
+      <div class="d-flex gap-2"><button type="submit" class="btn btn-primary flex-fill">Save</button><button type="button" onclick="closeProductEdit()" class="btn btn-outline-secondary flex-fill">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const CSRF = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrftoken='))?.split('=')[1]||'';
+
+function lockPools() {
+  fetch('/control/lock-pools/', {method:'GET'})
+    .then(r=>r.json())
+    .then(data=>{
+      alert(data.output || 'Done.');
+      location.reload();
+    });
+}
+
+function switchTab(name, btn) {
+  document.querySelectorAll('#section-store .tab-btn').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#section-store .cp-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if (name==='tracking' && !trackMap) initTrackMap();
+}
+
+function switchFactoryTab(name, btn) {
+  document.querySelectorAll('#section-factory .tab-btn').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#section-factory .cp-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(btn) btn.classList.add('active');
+}
+
+function switchSection(name) {
+  const isFactory = name === 'factory';
+  document.getElementById('section-store').style.display    = isFactory ? 'none' : 'block';
+  document.getElementById('section-factory').style.display  = isFactory ? 'block' : 'none';
+  const sb = document.getElementById('section-btn-store');
+  const fb = document.getElementById('section-btn-factory');
+  sb.style.background    = isFactory ? 'transparent' : '#fff';
+  sb.style.color         = isFactory ? '#6b7280' : '#2563eb';
+  sb.style.boxShadow     = isFactory ? 'none' : '0 1px 4px rgba(0,0,0,.08)';
+  fb.style.background    = isFactory ? '#fff' : 'transparent';
+  fb.style.color         = isFactory ? '#059669' : '#6b7280';
+  fb.style.boxShadow     = isFactory ? '0 1px 4px rgba(0,0,0,.08)' : 'none';
+  // Update URL hash so refresh keeps the section
+  history.replaceState(null, '', isFactory ? '?section=factory' : '?section=store');
+}
+
+// Auto-activate section from URL param
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('section') === 'factory') switchSection('factory');
+});
+
+function post(url, onSuccess) {
+  fetch(url, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+    .then(r=>r.json()).then(data=>{ if(data.ok) { onSuccess(data); location.reload(); } else alert(data.error||'Error'); });
+}
+
+// ── FACTORY ────────────────────────────────────────────────────────────────
+function verifyFactory(id, name) {
+  if (!confirm(`Verify factory "${name}"?`)) return;
+  post(`/control/factory/${id}/verify/`, () => {});
+}
+
+function deleteFactory(id, name) {
+  if (!confirm(`Delete factory "${name}" and its user account? This cannot be undone.`)) return;
+  post(`/control/factory/${id}/delete/`, () => {});
+}
+
+function openFactoryEdit(factoryId, factoryName) {
+  document.getElementById('factory-drawer-overlay').style.display = 'block';
+  document.getElementById('factory-drawer').style.display = 'block';
+  document.getElementById('factory-drawer-subtitle').textContent = factoryName;
+  document.getElementById('factory-drawer-loading').style.display = 'block';
+  document.getElementById('factory-edit-form').style.display = 'none';
+  fetch(`/control/factory/${factoryId}/edit/`).then(r => r.json()).then(data => {
+    document.getElementById('edit-factory-id').value       = data.id;
+    document.getElementById('edit-factory-name').value     = data.name || '';
+    document.getElementById('edit-factory-address').value  = data.address || '';
+    document.getElementById('edit-factory-license').value  = data.license_no || '';
+    document.getElementById('edit-factory-contact').value  = data.contact || '';
+    document.getElementById('edit-factory-city').value     = data.city || '';
+    document.getElementById('edit-factory-lat').value      = data.latitude || '';
+    document.getElementById('edit-factory-lng').value      = data.longitude || '';
+    document.getElementById('edit-factory-wallet').value   = data.wallet_balance || '';
+    document.getElementById('edit-factory-verified').checked = data.is_verified;
+    document.getElementById('edit-factory-gstin').value    = data.gstin || '';
+    document.getElementById('factory-drawer-loading').style.display = 'none';
+    document.getElementById('factory-edit-form').style.display = 'block';
+  });
+}
+function closeFactoryEdit() {
+  document.getElementById('factory-drawer-overlay').style.display = 'none';
+  document.getElementById('factory-drawer').style.display = 'none';
+}
+function submitFactoryEdit(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-factory-id').value;
+  const p = new FormData();
+  [['name','edit-factory-name'],['address','edit-factory-address'],['license_no','edit-factory-license'],
+   ['contact','edit-factory-contact'],['city','edit-factory-city'],['latitude','edit-factory-lat'],
+   ['longitude','edit-factory-lng'],['wallet_balance','edit-factory-wallet'],
+   ['gstin','edit-factory-gstin']].forEach(([k, elId]) =>
+    p.append(k, document.getElementById(elId).value || ''));
+  if (document.getElementById('edit-factory-verified').checked) p.append('is_verified', 'on');
+  p.append('csrfmiddlewaretoken', CSRF);
+  fetch(`/control/factory/${id}/edit/`, {method:'POST', body:p}).then(r => r.json()).then(data => {
+    const el = document.getElementById('factory-drawer-result');
+    if (data.ok) { el.innerHTML = `<div class="alert alert-success py-2">✅ ${data.message}</div>`; setTimeout(() => { closeFactoryEdit(); location.reload(); }, 1000); }
+    else el.innerHTML = `<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors || data.error)}</div>`;
+  });
+}
+
+function openFactoryOrderEdit(orderId) {
+  document.getElementById('factory-order-drawer-overlay').style.display = 'block';
+  document.getElementById('factory-order-drawer').style.display = 'block';
+  fetch(`/control/factory-order/${orderId}/edit/`).then(r => r.json()).then(data => {
+    document.getElementById('edit-fo-id').value = data.id;
+    document.getElementById('edit-fo-status').value = data.status;
+    document.getElementById('edit-fo-notes').value = data.notes || '';
+    document.getElementById('factory-order-drawer-subtitle').textContent = `${data.product} — ${data.factory}`;
+  });
+}
+function closeFactoryOrderEdit() {
+  document.getElementById('factory-order-drawer-overlay').style.display = 'none';
+  document.getElementById('factory-order-drawer').style.display = 'none';
+}
+function submitFactoryOrderEdit(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-fo-id').value;
+  const p = new FormData();
+  p.append('status', document.getElementById('edit-fo-status').value);
+  p.append('notes',  document.getElementById('edit-fo-notes').value);
+  p.append('csrfmiddlewaretoken', CSRF);
+  fetch(`/control/factory-order/${id}/edit/`, {method:'POST', body:p}).then(r => r.json()).then(data => {
+    const el = document.getElementById('factory-order-drawer-result');
+    if (data.ok) { el.innerHTML = `<div class="alert alert-success py-2">✅ ${data.message}</div>`; setTimeout(() => { closeFactoryOrderEdit(); location.reload(); }, 1000); }
+    else el.innerHTML = `<div class="alert alert-danger py-2">❌ ${data.error}</div>`;
+  });
+}
+
+function deleteFactoryOrder(id) {
+  if (!confirm('Delete this factory order record?')) return;
+  post(`/control/factory-order/${id}/delete/`, () => {});
+}
+
+function deleteFactoryPayout(id) {
+  if (!confirm('Delete this payout record? This cannot be undone.')) return;
+  post(`/control/factory-payout/${id}/delete/`, () => {});
+}
+
+function toggleBreakdown(id) {
+  const row = document.getElementById('breakdown-' + id);
+  if (!row) return;
+  const isHidden = row.style.display === 'none';
+  row.style.display = isHidden ? 'table-row' : 'none';
+}
+
+// ── FACTORY PRODUCTS ───────────────────────────────────────────────────────
+function openFactoryProductEdit(id) {
+  document.getElementById('factory-product-drawer-overlay').style.display = 'block';
+  document.getElementById('factory-product-drawer').style.display = 'block';
+  fetch(`/control/factory-product/${id}/edit/`).then(r => r.json()).then(data => {
+    document.getElementById('edit-fp-id').value       = data.id;
+    document.getElementById('edit-fp-name').value     = data.name;
+    document.getElementById('edit-fp-generic').value  = data.generic_name || '';
+    document.getElementById('edit-fp-sku').value      = data.sku_code || '';
+    document.getElementById('edit-fp-hsn').value      = data.hsn_code || '';
+    document.getElementById('edit-fp-barcode').value  = data.barcode || '';
+    document.getElementById('edit-fp-category').value = data.category;
+    document.getElementById('edit-fp-factory').value  = data.factory_id || '';
+    document.getElementById('edit-fp-price').value    = data.base_price;
+    document.getElementById('edit-fp-unit').value     = data.unit;
+  });
+}
+function closeFactoryProductEdit() {
+  document.getElementById('factory-product-drawer-overlay').style.display = 'none';
+  document.getElementById('factory-product-drawer').style.display = 'none';
+}
+function submitFactoryProductForm(e, productId) {
+  e.preventDefault();
+  const form = e.target;
+  const p = new FormData(form);
+  p.append('csrfmiddlewaretoken', CSRF);
+  const url = productId ? `/control/factory-product/${productId}/edit/` : '/control/factory-product/create/';
+  const resultEl = document.getElementById('factory-product-edit-result');
+  fetch(url, {method:'POST', body:p}).then(r => r.json()).then(data => {
+    if (data.ok) { resultEl.innerHTML = `<div class="alert alert-success py-2">✅ ${data.message}</div>`; setTimeout(() => { closeFactoryProductEdit(); location.reload(); }, 1000); }
+    else resultEl.innerHTML = `<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors)}</div>`;
+  });
+}
+function deleteFactoryProduct(id, name) {
+  if (!confirm(`Delete product "${name}"?`)) return;
+  post(`/control/factory-product/${id}/delete/`, () => {});
+}
+
+// ── DISPUTES ───────────────────────────────────────────────────────────────
+async function resolveDispute(id, action) {
+  const label = action === 'payout' ? 'release the factory payout' : 'refund the store';
+  const note  = prompt(`Note for ${label} (optional):`) ?? '';
+  if (note === null) return;
+  const res = await fetch(`/control/dispute/${id}/resolve/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ action, note }),
+  });
+  const data = await res.json();
+  if (data.ok) { alert(data.message); location.reload(); }
+  else alert(data.error || 'Error');
+}
+
+// ── WITHDRAWAL REQUESTS ────────────────────────────────────────────────────
+async function withdrawalAction(id, action) {
+  const note = action === 'reject'
+    ? (prompt('Rejection reason (optional):') || '')
+    : '';
+  if (action === 'reject' && note === null) return; // user cancelled prompt
+  const res = await fetch(`/control/withdrawal/${id}/action/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ action, note }),
+  });
+  const data = await res.json();
+  if (data.ok) { alert(data.message); location.reload(); }
+  else alert(data.error || 'Error');
+}
+
+// ── STORE ──────────────────────────────────────────────────────────────────
+function deleteStore(id, name) {
+  if (!confirm(`Delete store "${name}" and its user account? This cannot be undone.`)) return;
+  post(`/control/store/${id}/delete/`, ()=>{});
+}
+
+function openStoreEdit(storeId, storeName) {
+  document.getElementById('store-drawer-overlay').style.display='block';
+  document.getElementById('store-drawer').style.display='block';
+  document.getElementById('store-drawer-subtitle').textContent=storeName;
+  document.getElementById('store-drawer-loading').style.display='block';
+  document.getElementById('store-edit-form').style.display='none';
+  fetch(`/control/store/${storeId}/edit/`).then(r=>r.json()).then(data=>{
+    document.getElementById('edit-store-id').value=data.id;
+    document.getElementById('edit-store-name').value=data.name||'';
+    document.getElementById('edit-store-address').value=data.address||'';
+    document.getElementById('edit-store-license').value=data.license_no||'';
+    document.getElementById('edit-store-contact').value=data.contact||'';
+    document.getElementById('edit-store-city').value=data.city||'';
+    document.getElementById('edit-store-lat').value=data.latitude||'';
+    document.getElementById('edit-store-lng').value=data.longitude||'';
+    document.getElementById('edit-store-wallet').value=data.wallet_balance||'';
+    document.getElementById('edit-store-verified').checked=data.is_verified;
+    document.getElementById('edit-store-gstin').value=data.gstin||'';
+    document.getElementById('store-drawer-loading').style.display='none';
+    document.getElementById('store-edit-form').style.display='block';
+  });
+}
+function closeStoreEdit() { document.getElementById('store-drawer-overlay').style.display='none'; document.getElementById('store-drawer').style.display='none'; }
+function submitStoreEdit(e) {
+  e.preventDefault();
+  const id=document.getElementById('edit-store-id').value;
+  const p=new FormData();
+  [['name','edit-store-name'],['address','edit-store-address'],['license_no','edit-store-license'],
+   ['contact','edit-store-contact'],['city','edit-store-city'],['latitude','edit-store-lat'],
+   ['longitude','edit-store-lng'],['wallet_balance','edit-store-wallet'],
+   ['gstin','edit-store-gstin']].forEach(([k,elId])=>p.append(k,document.getElementById(elId).value||''));
+  if(document.getElementById('edit-store-verified').checked) p.append('is_verified','on');
+  p.append('csrfmiddlewaretoken',CSRF);
+  fetch(`/control/store/${id}/edit/`,{method:'POST',body:p}).then(r=>r.json()).then(data=>{
+    const el=document.getElementById('store-drawer-result');
+    if(data.ok){el.innerHTML=`<div class="alert alert-success py-2">✅ ${data.message}</div>`;setTimeout(()=>{closeStoreEdit();location.reload();},1000);}
+    else el.innerHTML=`<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors)}</div>`;
+  });
+}
+
+// ── PRODUCT ────────────────────────────────────────────────────────────────
+function openProductEdit(id) {
+  document.getElementById('product-drawer-overlay').style.display='block';
+  document.getElementById('product-drawer').style.display='block';
+  fetch(`/control/product/${id}/edit/`).then(r=>r.json()).then(data=>{
+    document.getElementById('edit-product-id').value=data.id;
+    document.getElementById('edit-product-name').value=data.name;
+    document.getElementById('edit-product-generic').value=data.generic_name||'';
+    document.getElementById('edit-product-sku').value=data.sku_code||'';
+    document.getElementById('edit-product-hsn').value=data.hsn_code||'';
+    document.getElementById('edit-product-barcode').value=data.barcode||'';
+    document.getElementById('edit-product-category').value=data.category;
+    document.getElementById('edit-product-factory').value=data.factory_name;
+    document.getElementById('edit-product-price').value=data.base_price;
+    document.getElementById('edit-product-unit').value=data.unit;
+  });
+}
+function closeProductEdit() { document.getElementById('product-drawer-overlay').style.display='none'; document.getElementById('product-drawer').style.display='none'; }
+function submitProductForm(e, productId) {
+  e.preventDefault();
+  const form = e.target;
+  const p = new FormData(form);
+  p.append('csrfmiddlewaretoken', CSRF);
+  const url = productId ? `/control/product/${productId}/edit/` : '/control/product/create/';
+  const resultEl = productId ? document.getElementById('product-edit-result') : document.getElementById('product-create-result');
+  fetch(url,{method:'POST',body:p}).then(r=>r.json()).then(data=>{
+    if(data.ok){resultEl.innerHTML=`<div class="alert alert-success py-2">✅ ${data.message}</div>`;setTimeout(()=>{if(productId)closeProductEdit();location.reload();},1000);}
+    else resultEl.innerHTML=`<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors)}</div>`;
+  });
+}
+function deleteProduct(id, name) {
+  if (!confirm(`Delete product "${name}"?`)) return;
+  post(`/control/product/${id}/delete/`, ()=>{});
+}
+
+// ── POOL ───────────────────────────────────────────────────────────────────
+function submitPoolCreate(e) {
+  e.preventDefault();
+  const p=new FormData(e.target);
+  p.append('csrfmiddlewaretoken',CSRF);
+  fetch('/control/pool/create/',{method:'POST',body:p}).then(r=>r.json()).then(data=>{
+    const el=document.getElementById('pool-create-result');
+    if(data.ok){el.innerHTML=`<div class="alert alert-success py-2">✅ ${data.message}</div>`;setTimeout(()=>location.reload(),1000);}
+    else el.innerHTML=`<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors)}</div>`;
+  });
+}
+function deletePool(id, name) {
+  if (!confirm(`Delete pool for "${name}"?`)) return;
+  post(`/control/pool/${id}/delete/`, ()=>{});
+}
+function openPoolEdit(poolId, productName) {
+  document.getElementById('pool-drawer-overlay').style.display='block';
+  document.getElementById('pool-drawer').style.display='block';
+  document.getElementById('drawer-subtitle').textContent=productName;
+  document.getElementById('drawer-loading').style.display='block';
+  document.getElementById('pool-edit-form').style.display='none';
+  fetch(`/control/pool/${poolId}/edit/`).then(r=>r.json()).then(data=>{
+    document.getElementById('edit-pool-id').value=data.id;
+    document.getElementById('edit-city').value=data.city;
+    document.getElementById('edit-status').value=data.status;
+    document.getElementById('edit-expires').value=data.expires_at;
+    document.getElementById('info-members').textContent=data.current_member_count;
+    document.getElementById('info-qty').textContent=data.total_qty;
+    document.getElementById('drawer-loading').style.display='none';
+    document.getElementById('pool-edit-form').style.display='block';
+  });
+}
+function closePoolEdit() { document.getElementById('pool-drawer-overlay').style.display='none'; document.getElementById('pool-drawer').style.display='none'; }
+function submitPoolEdit(e) {
+  e.preventDefault();
+  const id=document.getElementById('edit-pool-id').value;
+  const p=new FormData();
+  p.append('city',document.getElementById('edit-city').value);
+  p.append('status',document.getElementById('edit-status').value);
+  p.append('expires_at',document.getElementById('edit-expires').value);
+  p.append('csrfmiddlewaretoken',CSRF);
+  fetch(`/control/pool/${id}/edit/`,{method:'POST',body:p}).then(r=>r.json()).then(data=>{
+    const el=document.getElementById('drawer-result');
+    if(data.ok){el.innerHTML=`<div class="alert alert-success py-2">✅ ${data.message}</div>`;setTimeout(()=>{closePoolEdit();location.reload();},1000);}
+    else el.innerHTML=`<div class="alert alert-danger py-2">❌ ${JSON.stringify(data.errors)}</div>`;
+  });
+}
+
+// ── ORDERS ─────────────────────────────────────────────────────────────────
+function cancelOrder(id) {
+  if (!confirm('Cancel this order?')) return;
+  post(`/control/order/${id}/cancel/`, ()=>{});
+}
+
+// ── DELIVERIES ─────────────────────────────────────────────────────────────
+function cancelDelivery(id) {
+  if (!confirm('Mark this delivery as failed/cancelled?')) return;
+  post(`/control/delivery/${id}/cancel/`, ()=>{});
+}
+function deleteDelivery(id) {
+  if (!confirm('Permanently delete this delivery record?')) return;
+  post(`/control/delivery/${id}/delete/`, ()=>{});
+}
+
+// ── LIVE TRACKING ──────────────────────────────────────────────────────────
+const truckIcon = L.divIcon({html:'<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">🚚</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+const storeIcon = L.divIcon({html:'<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">🏪</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+const factoryIcon = L.divIcon({html:'<div style="font-size:26px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3))">🏭</div>',className:'',iconSize:[30,30],iconAnchor:[15,15]});
+
+let trackMap=null, trackTruckMarker=null, trackStoreMarker=null, trackFactoryMarker=null;
+let trackRouteLayer=null, trackPoller=null, trackInitialDist=null;
+let trackRouteCoords=[], trackAnimFrame=null, trackAnimStart=null, trackAnimDuration=null, trackDelivered=false;
+
+function initTrackMap() {
+  trackMap=L.map('track-map').setView([23.0225,72.5714],13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',subdomains:'abcd',maxZoom:19}).addTo(trackMap);
+}
+
+function loadTracking(id) {
+  switchTab('tracking', document.querySelector('.tab-btn:last-of-type'));
+  if(!trackMap) initTrackMap();
+  document.getElementById('track-delivery-select').value=id;
+  startTracking();
+}
+
+async function startTracking() {
+  const id=document.getElementById('track-delivery-select').value;
+  if(!id) return;
+  if(trackPoller) clearInterval(trackPoller);
+  if(trackAnimFrame) cancelAnimationFrame(trackAnimFrame);
+  [trackTruckMarker,trackStoreMarker,trackFactoryMarker,trackRouteLayer].forEach(l=>{if(l)trackMap.removeLayer(l);});
+  trackTruckMarker=trackStoreMarker=trackFactoryMarker=trackRouteLayer=null;
+  trackRouteCoords=[]; trackDelivered=false; trackInitialDist=null;
+  trackAnimFrame=null; trackAnimStart=null;
+
+  // Give the map time to render if tab was just switched
+  await new Promise(r=>setTimeout(r,150));
+  trackMap.invalidateSize();
+
+  const res=await fetch(`/delivery/${id}/location/`);
+  if(!res.ok){document.getElementById('track-status-badge').innerHTML='⏳ Waiting...';return;}
+  const data=await res.json();
+  if(data.error){document.getElementById('track-status-badge').innerHTML='⏳ Waiting for dispatch...';return;}
+
+  const factoryPos=[data.factory_lat,data.factory_lng];
+  const storePos=[data.store_lat,data.store_lng];
+
+  trackFactoryMarker=L.marker(factoryPos,{icon:factoryIcon}).addTo(trackMap).bindPopup(`🏭 ${data.factory_name}`);
+  trackStoreMarker=L.marker(storePos,{icon:storeIcon}).addTo(trackMap).bindPopup(`🏪 ${data.store_name}`);
+  trackTruckMarker=L.marker(factoryPos,{icon:truckIcon,zIndexOffset:1000}).addTo(trackMap).bindPopup('🚚 Truck');
+  document.getElementById('t-store-name').textContent=`🏪 ${data.store_name}`;
+
+  // Fetch OSRM route
+  try {
+    const r=await fetch(`https://router.project-osrm.org/route/v1/car/${factoryPos[1]},${factoryPos[0]};${storePos[1]},${storePos[0]}?overview=full&geometries=geojson`);
+    const rd=await r.json();
+    if(rd.routes?.[0]){
+      trackRouteLayer=L.geoJSON(rd.routes[0].geometry,{style:{color:'#1a73e8',weight:6,opacity:.9}}).addTo(trackMap);
+      trackRouteCoords=rd.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      trackMap.fitBounds(trackRouteLayer.getBounds(),{padding:[40,40]});
+      const etaMin=Math.max(1,Math.round(rd.routes[0].duration/60));
+      document.getElementById('t-eta').textContent=etaMin;
+      document.getElementById('t-dist').textContent=(rd.routes[0].distance/1000).toFixed(1);
+      // Draw alt route behind
+      if(rd.routes[1]) L.geoJSON(rd.routes[1].geometry,{style:{color:'#94a3b8',weight:4,opacity:.4}}).addTo(trackMap);
+      if(data.status==='dispatched') startTrackAnimation(etaMin);
+    }
+  } catch(e) {
+    trackMap.fitBounds(L.latLngBounds(factoryPos,storePos),{padding:[40,40]});
+    document.getElementById('t-eta').textContent=data.eta_minutes??'—';
+    document.getElementById('t-dist').textContent=data.distance_km??'—';
+    // Fallback: straight-line animation
+    trackRouteCoords=[factoryPos, storePos];
+    if(data.status==='dispatched') startTrackAnimation(Math.max(1,data.eta_minutes||15));
+  }
+
+  document.getElementById('t-speed').textContent=data.speed_kmh||40;
+  document.getElementById('t-updated').textContent=data.updated_at;
+  const statusMap={dispatched:'<span class="pulse"></span>In Transit',delivered:'✅ Delivered',pending:'⏳ Preparing'};
+  document.getElementById('track-status-badge').innerHTML=statusMap[data.status]||data.status;
+  if(data.status==='delivered'){trackTruckMarker.setLatLng(storePos);document.getElementById('t-progress').style.width='100%';}
+}
+
+function interpolate(coords,t){
+  if(!coords.length) return null;
+  if(t<=0) return coords[0]; if(t>=1) return coords[coords.length-1];
+  let total=0,segs=[];
+  for(let i=1;i<coords.length;i++){const d=Math.hypot(coords[i][0]-coords[i-1][0],coords[i][1]-coords[i-1][1]);segs.push(d);total+=d;}
+  let target=t*total,acc=0;
+  for(let i=0;i<segs.length;i++){if(acc+segs[i]>=target){const f=(target-acc)/segs[i];return[coords[i][0]+(coords[i+1][0]-coords[i][0])*f,coords[i][1]+(coords[i+1][1]-coords[i][1])*f];}acc+=segs[i];}
+  return coords[coords.length-1];
+}
+
+function startTrackAnimation(etaMin){
+  trackAnimStart=performance.now(); trackAnimDuration=etaMin*60*1000;
+  function tick(now){
+    if(trackDelivered) return;
+    const t=Math.min((now-trackAnimStart)/trackAnimDuration,1);
+    const pos=interpolate(trackRouteCoords,t);
+    if(pos&&trackTruckMarker) trackTruckMarker.setLatLng(pos);
+    const pct=Math.round(t*100);
+    document.getElementById('t-progress').style.width=pct+'%';
+    document.getElementById('t-progress-label').textContent=`${pct}% completed`;
+    document.getElementById('t-eta').textContent=Math.ceil(Math.max(0,trackAnimDuration-(now-trackAnimStart))/60000);
+    if(t>=1){
+      trackDelivered=true;
+      document.getElementById('track-status-badge').innerHTML='📍 Truck Arrived — Awaiting OTP';
+      document.getElementById('t-progress-label').textContent='Truck at destination — confirm via OTP';
+      // No auto-deliver — status only changes via OTP confirmation
+      return;
+    }
+    trackAnimFrame=requestAnimationFrame(tick);
+  }
+  trackAnimFrame=requestAnimationFrame(tick);
+}
+</script>
+{% endblock %}
+

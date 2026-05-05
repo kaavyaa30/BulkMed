@@ -1,0 +1,347 @@
+﻿{% extends "base.html" %}
+{% block title %}Wallet — {{ factory.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fac-page{background:var(--gray-50);min-height:calc(100vh - 64px);padding:28px 0 56px;}
+  .wallet-hero{background:linear-gradient(135deg,#78350f,#d97706,#f59e0b);border-radius:20px;padding:28px 32px;margin-bottom:24px;color:#fff;box-shadow:0 8px 32px rgba(217,119,6,.25);}
+  .wallet-hero h2{font-size:1.5rem;font-weight:800;margin:0;}
+  .wallet-hero p{color:rgba(255,255,255,.72);font-size:.875rem;margin:5px 0 0;}
+  .wbal{font-size:2.8rem;font-weight:800;letter-spacing:-2px;color:#fff;margin-top:12px;}
+  .wbal-sub{font-size:.8rem;color:rgba(255,255,255,.65);margin-top:2px;}
+  .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:24px;}
+  .stat-box{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius);padding:20px 22px;box-shadow:var(--shadow-sm);}
+  .stat-box .slabel{font-size:.65rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gray-400);margin-bottom:6px;}
+  .stat-box .sval{font-size:1.6rem;font-weight:800;letter-spacing:-1px;}
+  /* Section card — neutral header */
+  .s-card{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;}
+  .s-head{padding:14px 20px;background:#fff;border-bottom:1px solid var(--gray-200);display:flex;justify-content:space-between;align-items:center;}
+  .s-title{font-weight:700;font-size:.9rem;color:var(--gray-800);display:flex;align-items:center;gap:8px;}
+  .s-icon{width:32px;height:32px;border-radius:var(--radius-sm);background:var(--warning-light);color:var(--warning);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.9rem;}
+  /* Table */
+  .f-table th{padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;background:var(--gray-50);color:var(--gray-500);border-bottom:1px solid var(--gray-200);white-space:nowrap;}
+  .f-table td{padding:12px 16px;border-bottom:1px solid var(--gray-100);vertical-align:middle;font-size:.84rem;}
+  .f-table tbody tr:last-child td{border-bottom:none;}
+  .f-table tbody tr:hover{background:var(--gray-50);}
+  /* Pills */
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:99px;}
+  .pill-paid{background:var(--success-light);color:var(--success);}
+  .pill-pending{background:var(--warning-light);color:var(--warning);}
+  /* Payout split summary card */
+  .split-summary{background:#fff;border:1px solid var(--gray-200);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:24px;}
+  .split-summary-header{padding:14px 20px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);}
+  .split-summary-label{font-size:.65rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gray-400);}
+  /* Split bar */
+  .split-bar-track{height:8px;border-radius:99px;background:var(--gray-100);overflow:hidden;display:flex;}
+  .split-bar-factory{background:var(--success);border-radius:99px 0 0 99px;}
+  .split-bar-platform{background:var(--danger);border-radius:0 99px 99px 0;}
+  /* Pending notice */
+  .pending-notice{background:var(--warning-light);border:1px solid #fde68a;border-radius:var(--radius-sm);padding:10px 14px;font-size:.8rem;color:#92400e;}
+  /* Table footer totals row */
+  .tfoot-totals{background:var(--gray-50);border-top:2px solid var(--gray-200);}
+  .tfoot-totals td{padding:12px 16px;font-weight:700;}
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">🏭</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_products' %}"><i class="bi bi-capsule me-1"></i>Products</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="fac-page">
+<div class="container-fluid px-4" style="max-width:1100px;margin:0 auto;">
+
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+
+  <!-- Wallet hero -->
+  <div class="wallet-hero">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+      <div>
+        <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px;">EARNINGS WALLET</div>
+        <h2>{{ factory.name }}</h2>
+        <p>85% of every confirmed delivery is credited here automatically.</p>
+        <div class="wbal">₹{{ factory.wallet_balance|floatformat:2 }}</div>
+        <div class="wbal-sub">Current balance</div>
+        <button onclick="openWithdraw()" style="margin-top:14px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.35);border-radius:10px;padding:9px 20px;font-size:.85rem;font-weight:700;color:#fff;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+          <i class="bi bi-arrow-up-circle me-1"></i> Withdraw Funds
+        </button>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:.72rem;color:rgba(255,255,255,.65);margin-bottom:4px;">Commission model</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#fff;">85% / 15%</div>
+        <div style="font-size:.72rem;color:rgba(255,255,255,.55);">Factory / Platform</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary stats -->
+  <div class="stat-row">
+    <div class="stat-box">
+      <div class="slabel">This Month</div>
+      <div class="sval" style="color:#059669;">₹{{ month_earned|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Total Paid Out</div>
+      <div class="sval" style="color:#2563eb;">₹{{ total_paid|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Pending Release</div>
+      <div class="sval" style="color:#d97706;">₹{{ total_pending|floatformat:2 }}</div>
+    </div>
+    <div class="stat-box">
+      <div class="slabel">Total Transactions</div>
+      <div class="sval">{{ payouts|length }}</div>
+    </div>
+  </div>
+
+  <!-- ── Escrow Split Summary Card ── -->
+  {% if payouts %}
+  <div class="split-summary">
+    <div class="split-summary-header">
+      <span class="split-summary-label"><i class="bi bi-pie-chart me-1"></i>Lifetime Escrow Split — How Your Earnings Are Calculated</span>
+    </div>
+    <div class="p-4">
+      <div class="row g-3 mb-4">
+
+        <!-- Gross -->
+        <div class="col-12 col-md-4">
+          <div class="stat-card h-100">
+            <div class="stat-icon" style="background:var(--gray-100);">💰</div>
+            <div class="stat-value" style="font-size:1.4rem;">₹{{ total_gross|floatformat:2 }}</div>
+            <div class="stat-label">Gross Pool Amount</div>
+            <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">Total order value before deductions</div>
+          </div>
+        </div>
+
+        <!-- Commission -->
+        <div class="col-12 col-md-4">
+          <div class="stat-card h-100" style="border-color:var(--danger-light);">
+            <div class="stat-icon" style="background:var(--danger-light);">🏛️</div>
+            <div class="stat-value text-danger" style="font-size:1.4rem;">−₹{{ total_commission|floatformat:2 }}</div>
+            <div class="stat-label">Platform Commission (15%)</div>
+            <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">BulkMed service fee across all orders</div>
+          </div>
+        </div>
+
+        <!-- Net -->
+        <div class="col-12 col-md-4">
+          <div class="stat-card h-100" style="border-color:#bbf7d0;">
+            <div class="stat-icon" style="background:var(--success-light);">✅</div>
+            <div class="stat-value text-success" style="font-size:1.4rem;">₹{{ total_paid|floatformat:2 }}</div>
+            <div class="stat-label">Net Payout to You (85%)</div>
+            <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">Paid + ₹{{ total_pending|floatformat:2 }} pending release</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Visual split bar -->
+      <div>
+        <div class="d-flex justify-content-between mb-1" style="font-size:.72rem;font-weight:600;color:var(--gray-600);">
+          <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:5px;"></span>Your Share — 85%</span>
+          <span>Platform — 15%<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-left:5px;"></span></span>
+        </div>
+        <div class="split-bar-track">
+          <div class="split-bar-factory" style="width:85%;"></div>
+          <div class="split-bar-platform" style="width:15%;"></div>
+        </div>
+        <div class="d-flex justify-content-between mt-1" style="font-size:.68rem;color:var(--gray-400);">
+          <span>₹{{ total_paid|floatformat:2 }} paid + ₹{{ total_pending|floatformat:2 }} pending</span>
+          <span>₹{{ total_commission|floatformat:2 }} deducted</span>
+        </div>
+      </div>
+
+      <!-- Pending breakdown notice -->
+      {% if total_pending > 0 %}
+      <div class="pending-notice mt-3">
+        <i class="bi bi-hourglass-split me-2" style="color:var(--warning);"></i>
+        <strong>Awaiting Release:</strong>
+        Gross ₹{{ pending_gross|floatformat:2 }} &nbsp;→&nbsp;
+        Commission −₹{{ pending_commission|floatformat:2 }} &nbsp;→&nbsp;
+        <strong class="text-success">Net ₹{{ total_pending|floatformat:2 }}</strong>
+        will be credited to your wallet once the admin approves.
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Payout history -->
+  <div class="s-card">
+    <div class="s-head">
+      <div class="s-title">
+        <div class="s-icon"><i class="bi bi-receipt"></i></div>
+        Payout History
+      </div>
+      <span style="font-size:.75rem;color:var(--gray-400);">{{ payouts|length }} record{{ payouts|length|pluralize }}</span>
+    </div>
+    {% if payouts %}
+    <div class="table-responsive">
+      <table class="table mb-0 f-table" id="tbl-payouts" data-paginate="10">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Medicine</th>
+            <th>Store</th>
+            <th>Gross Amount</th>
+            <th>Commission (15%)</th>
+            <th>Net to You (85%)</th>
+            <th>Split</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in payouts %}
+          <tr>
+            <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">{{ p.created_at|date:"d M Y, H:i" }}</td>
+
+            <td style="font-weight:600;color:#111827;">{{ p.pool.product.name }}</td>
+
+            <td style="color:#6b7280;font-size:.82rem;">
+              {% if p.delivery %}{{ p.delivery.store.name }}{% else %}—{% endif %}
+            </td>
+
+            <!-- Gross — 100% of order value -->
+            <td>
+              <div style="font-weight:700;color:#374151;">₹{{ p.gross_amount|floatformat:2 }}</div>
+              <div style="font-size:.68rem;color:#9ca3af;">100% of order</div>
+            </td>
+
+            <!-- Commission deducted — always 15% -->
+            <td>
+              <div style="font-weight:700;color:#dc2626;">−₹{{ p.commission_deducted|floatformat:2 }}</div>
+              <div style="font-size:.68rem;color:#9ca3af;">BulkMed fee</div>
+            </td>
+
+            <!-- Net payout — always 85% -->
+            <td>
+              <div style="font-weight:800;color:#059669;font-size:.95rem;">₹{{ p.net_payout|floatformat:2 }}</div>
+              <div style="font-size:.68rem;color:#9ca3af;">Your earnings</div>
+            </td>
+
+            <!-- Mini visual split bar -->
+            <td style="min-width:72px;">
+              <div style="height:5px;border-radius:99px;background:var(--gray-200);overflow:hidden;display:flex;margin-bottom:3px;">
+                <div style="width:85%;background:var(--success);border-radius:99px 0 0 99px;"></div>
+                <div style="width:15%;background:var(--danger);border-radius:0 99px 99px 0;"></div>
+              </div>
+              <div style="font-size:.6rem;color:var(--gray-400);text-align:center;white-space:nowrap;">85% / 15%</div>
+            </td>
+
+            <td>
+              {% if p.status == 'paid' %}
+              <span class="pill pill-paid">✅ Paid</span>
+              {% if p.paid_at %}
+              <div style="font-size:.65rem;color:#9ca3af;margin-top:3px;">{{ p.paid_at|date:"d M Y" }}</div>
+              {% endif %}
+              {% else %}
+              <span class="pill pill-pending">⏳ Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+
+        <!-- Totals footer -->
+        <tfoot>
+          <tr class="tfoot-totals">
+            <td colspan="3" style="font-size:.75rem;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-500);">
+              <i class="bi bi-sigma me-1"></i>All-time Totals
+            </td>
+            <td style="color:var(--gray-800);">₹{{ total_gross|floatformat:2 }}</td>
+            <td style="color:var(--danger);">−₹{{ total_commission|floatformat:2 }}</td>
+            <td style="color:var(--success);font-size:.95rem;">₹{{ total_paid|floatformat:2 }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 24px;color:#9ca3af;">
+      <div style="font-size:3rem;margin-bottom:12px;">💰</div>
+      <p style="font-size:.9rem;">No payouts yet. They appear here after stores confirm delivery via OTP.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+
+<!-- ── Withdraw Funds Modal ── -->
+<div class="modal fade" id="withdrawModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content" style="border-radius:16px;">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold"><i class="bi bi-arrow-up-circle me-2 text-warning"></i>Withdraw Funds</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:28px;">
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:6px;">
+          Available balance: <strong style="color:#059669;">₹{{ factory.wallet_balance|floatformat:2 }}</strong>
+        </p>
+        <p style="font-size:.78rem;color:#9ca3af;margin-bottom:20px;">
+          Withdrawal requests are reviewed by the BulkMed admin team within 1–2 business days.
+        </p>
+        <div class="mb-3">
+          <label style="font-size:.82rem;font-weight:600;color:#374151;margin-bottom:6px;display:block;">Amount to Withdraw (₹)</label>
+          <input type="number" id="withdraw-amount" class="form-control" placeholder="e.g. 5000" min="1" style="font-size:1.1rem;font-weight:700;text-align:center;">
+        </div>
+        <div id="withdraw-result" class="mb-3"></div>
+        <button onclick="submitWithdrawal()" class="btn btn-warning w-100" style="font-weight:700;padding:12px;font-size:.95rem;">
+          <i class="bi bi-send me-2"></i>Submit Withdrawal Request
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSRF_W = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith('csrftoken='))?.split('=')[1]||'';
+
+function openWithdraw() {
+  new bootstrap.Modal(document.getElementById('withdrawModal')).show();
+}
+
+async function submitWithdrawal() {
+  const amount = parseFloat(document.getElementById('withdraw-amount').value);
+  const resultEl = document.getElementById('withdraw-result');
+  if (!amount || amount <= 0) {
+    resultEl.innerHTML = '<div class="alert alert-danger py-2">Please enter a valid amount.</div>';
+    return;
+  }
+  const res = await fetch('/factory/withdraw/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF_W },
+    body: JSON.stringify({ amount }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    resultEl.innerHTML = `<div class="alert alert-success py-2">✅ ${data.message}</div>`;
+    setTimeout(() => location.reload(), 1500);
+  } else {
+    resultEl.innerHTML = `<div class="alert alert-danger py-2">❌ ${data.error}</div>`;
+  }
+}
+</script>
+{% endblock %}

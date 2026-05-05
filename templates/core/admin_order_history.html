@@ -1,0 +1,385 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Admin Order History — BulkMed{% endblock %}
+
+{% block extra_css %}
+<style>
+  .aoh-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 56px; }
+
+  /* Hero */
+  .aoh-hero {
+    background:linear-gradient(135deg,#065f46 0%,#10b981 55%,#34d399 100%);
+    border-radius:20px; padding:28px 32px; margin-bottom:24px;
+    box-shadow:0 8px 32px rgba(6,95,70,.22);
+  }
+  .aoh-hero h1 { font-size:1.7rem; font-weight:800; color:#fff; margin:0; letter-spacing:-.5px; }
+  .aoh-hero p  { color:rgba(255,255,255,.8); font-size:.85rem; margin:6px 0 0; }
+
+  /* Summary cards */
+  .sum-card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px 20px 14px; box-shadow:0 2px 10px rgba(0,0,0,.05); overflow:hidden; position:relative; }
+  .sum-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:14px 14px 0 0; }
+  .sum-card.em::before  { background:linear-gradient(90deg,#10b981,#34d399); }
+  .sum-card.bl::before  { background:linear-gradient(90deg,#2563eb,#60a5fa); }
+  .sum-card.vi::before  { background:linear-gradient(90deg,#7c3aed,#a78bfa); }
+  .sum-card.am::before  { background:linear-gradient(90deg,#d97706,#fcd34d); }
+  .sum-card .lbl { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:8px; }
+  .sum-card .val { font-size:1.5rem; font-weight:800; letter-spacing:-1px; line-height:1; }
+  .sum-card .sub { font-size:.7rem; color:#9ca3af; margin-top:5px; }
+
+  /* Pool accordion */
+  .pool-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; margin-bottom:16px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+  .pool-header {
+    padding:16px 20px; cursor:pointer; display:flex; align-items:center; gap:14px;
+    transition:background .15s; user-select:none;
+  }
+  .pool-header:hover { background:#f9fafb; }
+  .pool-header.open  { background:#f0fdf4; border-bottom:1px solid #d1fae5; }
+  .pool-chevron { transition:transform .2s; color:#6b7280; font-size:.9rem; margin-left:auto; flex-shrink:0; }
+  .pool-header.open .pool-chevron { transform:rotate(180deg); color:#10b981; }
+
+  .pool-body { display:none; }
+  .pool-body.open { display:block; }
+
+  /* Breakdown box inside pool */
+  .breakdown-box {
+    margin:16px 20px; border:1.5px solid #d1fae5; border-radius:12px; overflow:hidden;
+  }
+  .breakdown-head {
+    background:linear-gradient(135deg,#065f46,#10b981);
+    padding:11px 18px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .breakdown-head .title { font-weight:700; font-size:.82rem; color:#fff; display:flex; align-items:center; gap:7px; }
+  .breakdown-totals { display:flex; gap:0; }
+  .breakdown-total-cell { padding:14px 20px; border-right:1px solid #f3f4f6; text-align:center; }
+  .breakdown-total-cell:last-child { border-right:none; }
+  .breakdown-total-cell .bt-lbl { font-size:.62rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; margin-bottom:4px; }
+  .breakdown-total-cell .bt-val { font-size:1.1rem; font-weight:800; letter-spacing:-.5px; }
+
+  /* Entry table */
+  .entry-table { width:100%; border-collapse:collapse; font-size:.81rem; }
+  .entry-table thead th {
+    padding:9px 14px; font-size:.66rem; text-transform:uppercase; letter-spacing:.5px;
+    color:#6b7280; font-weight:600; background:#f9fafb; border-bottom:1px solid #e5e7eb;
+    white-space:nowrap;
+  }
+  .entry-table tbody td { padding:12px 14px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+  .entry-table tbody tr:last-child td { border-bottom:none; }
+  .entry-table tbody tr:hover { background:#f9fafb; }
+
+  /* Status pills */
+  .s-active   { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+  .s-cancelled{ background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+  .s-penalty  { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+  .status-pill { font-size:.68rem; font-weight:700; padding:2px 9px; border-radius:99px; white-space:nowrap; }
+
+  /* Mode tags */
+  .mode-urgent { background:#fef2f2; color:#dc2626; }
+  .mode-pool   { background:#ede9fe; color:#7c3aed; }
+  .mode-tag    { font-size:.7rem; font-weight:600; padding:2px 8px; border-radius:99px; }
+
+  /* Pool status badge */
+  .ps-open      { background:#f0fdf4; color:#16a34a; border:1px solid #bbf7d0; }
+  .ps-locked    { background:#fffbeb; color:#92400e; border:1px solid #fde68a; }
+  .ps-fulfilled { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .ps-cancelled { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+  .ps-badge     { font-size:.68rem; font-weight:700; padding:2px 9px; border-radius:99px; }
+
+  /* Empty */
+  .empty-state { text-align:center; padding:64px 24px; color:#9ca3af; }
+  .empty-state i { font-size:2.5rem; display:block; margin-bottom:12px; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'financial_audit_trail' %}"><i class="bi bi-journal-text me-1"></i>Audit Trail</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="aoh-page">
+  <div class="container-fluid px-4" style="max-width:1400px;margin:0 auto;">
+
+    {# ── Hero ── #}
+    <div class="aoh-hero">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <div style="font-size:.65rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:6px;">SUPERADMIN · PLATFORM INTELLIGENCE</div>
+          <h1>Admin Order History</h1>
+          <p>Every order, every store, every rupee — grouped by pool with full calculation proof.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'admin_order_history_csv' %}"
+             style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:10px;padding:10px 18px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:7px;backdrop-filter:blur(8px);">
+            <i class="bi bi-download"></i> Download CSV
+          </a>
+          <a href="{% url 'dashboard' %}"
+             style="background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.2);border-radius:10px;padding:10px 16px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px;">
+            <i class="bi bi-arrow-left"></i> Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+
+    {# ── Summary Row ── #}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <div class="sum-card bl">
+          <div class="lbl">Total Orders</div>
+          <div class="val" style="color:#2563eb;">{{ grand_orders }}</div>
+          <div class="sub">Across all pools</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-card em">
+          <div class="lbl">Gross Collected</div>
+          <div class="val" style="color:#10b981;">₹{{ grand_gross|floatformat:2|intcomma }}</div>
+          <div class="sub">Total order value</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-card vi">
+          <div class="lbl">Platform Commission</div>
+          <div class="val" style="color:#7c3aed;">₹{{ grand_commission|floatformat:2|intcomma }}</div>
+          <div class="sub">15% of gross</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="sum-card am">
+          <div class="lbl">Factory Payouts</div>
+          <div class="val" style="color:#d97706;">₹{{ grand_payout|floatformat:2|intcomma }}</div>
+          <div class="sub">85% of gross</div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Pool Accordion ── #}
+    {% if pool_rows %}
+
+    {# Search / filter bar #}
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(0,0,0,.04);">
+      <i class="bi bi-search" style="color:#9ca3af;"></i>
+      <input id="pool-search" type="text" placeholder="Search by medicine, store, city…"
+             style="border:none;outline:none;font-size:.85rem;color:#374151;flex:1;background:transparent;"
+             oninput="filterPools(this.value)">
+      <span id="pool-count" style="font-size:.75rem;color:#9ca3af;white-space:nowrap;">{{ pool_rows|length }} pools</span>
+    </div>
+
+    <div id="pool-list">
+    {% for row in pool_rows %}
+    <div class="pool-card" data-search="{{ row.product_name|lower }} {{ row.city|lower }}{% for e in row.entries %} {{ e.store_name|lower }} {{ e.username|lower }}{% endfor %}">
+
+      {# ── Pool header (click to expand) ── #}
+      <div class="pool-header" onclick="togglePool(this)">
+
+        {# Left: product + city #}
+        <div style="width:36px;height:36px;border-radius:10px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="bi bi-capsule" style="color:#10b981;"></i>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:.9rem;color:#111827;">{{ row.product_name }}</div>
+          <div style="font-size:.72rem;color:#6b7280;margin-top:2px;">
+            <i class="bi bi-geo-alt" style="color:#9ca3af;"></i> {{ row.city }}
+            &nbsp;·&nbsp;
+            <span class="mode-tag {% if row.mode == 'urgent' %}mode-urgent{% else %}mode-pool{% endif %}">
+              {% if row.mode == 'urgent' %}⚡ Fast Track{% else %}⏳ Pool Mode{% endif %}
+            </span>
+          </div>
+        </div>
+
+        {# Centre: key numbers #}
+        <div class="d-none d-md-flex gap-4 align-items-center">
+          <div style="text-align:center;">
+            <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;">Stores</div>
+            <div style="font-size:1rem;font-weight:800;color:#111827;">{{ row.member_count }}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;">Gross</div>
+            <div style="font-size:1rem;font-weight:800;color:#10b981;">₹{{ row.pool_gross|floatformat:2|intcomma }}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;">Commission</div>
+            <div style="font-size:1rem;font-weight:800;color:#7c3aed;">₹{{ row.pool_commission|floatformat:2|intcomma }}</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#9ca3af;">Net Payout</div>
+            <div style="font-size:1rem;font-weight:800;color:#d97706;">₹{{ row.pool_payout|floatformat:2|intcomma }}</div>
+          </div>
+        </div>
+
+        {# Right: status + chevron #}
+        <span class="ps-badge
+          {% if row.status == 'open' %}ps-open
+          {% elif row.status == 'locked' %}ps-locked
+          {% elif row.status == 'fulfilled' %}ps-fulfilled
+          {% else %}ps-cancelled{% endif %}">
+          {{ row.pool.get_status_display }}
+        </span>
+        <i class="bi bi-chevron-down pool-chevron"></i>
+      </div>
+
+      {# ── Pool body (hidden until expanded) ── #}
+      <div class="pool-body">
+
+        {# Calculation breakdown summary #}
+        <div class="breakdown-box">
+          <div class="breakdown-head">
+            <div class="title"><i class="bi bi-calculator"></i> Pool Calculation Breakdown</div>
+            <span style="font-size:.7rem;color:rgba(255,255,255,.75);">{{ row.member_count }} store{{ row.member_count|pluralize }}</span>
+          </div>
+          <div class="breakdown-totals">
+            <div class="breakdown-total-cell">
+              <div class="bt-lbl">Gross Pool Amount</div>
+              <div class="bt-val" style="color:#111827;">₹{{ row.pool_gross|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="breakdown-total-cell">
+              <div class="bt-lbl">Platform Commission (15%)</div>
+              <div class="bt-val" style="color:#dc2626;">−₹{{ row.pool_commission|floatformat:2|intcomma }}</div>
+            </div>
+            <div class="breakdown-total-cell">
+              <div class="bt-lbl">Net Factory Payout (85%)</div>
+              <div class="bt-val" style="color:#10b981;">₹{{ row.pool_payout|floatformat:2|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+
+        {# Per-store entry table #}
+        <div style="padding:0 20px 20px;">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#6b7280;margin-bottom:10px;">
+            <i class="bi bi-list-ul me-1"></i> Store-by-Store Breakdown
+          </div>
+          <div style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+            <table class="entry-table">
+              <thead>
+                <tr>
+                  <th>Store</th>
+                  <th>User</th>
+                  <th>City</th>
+                  <th>Mode</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Discount</th>
+                  <th>Gross</th>
+                  <th>Commission (15%)</th>
+                  <th>Net Payout (85%)</th>
+                  <th>Escrow Paid</th>
+                  <th>Balance Due</th>
+                  <th>Status</th>
+                  <th>Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for e in row.entries %}
+                <tr>
+                  <td>
+                    <div style="font-weight:600;color:#111827;">{{ e.store_name }}</div>
+                  </td>
+                  <td style="color:#6b7280;font-size:.78rem;">{{ e.username }}</td>
+                  <td style="font-size:.78rem;color:#6b7280;">{{ e.city }}</td>
+                  <td>
+                    <span class="mode-tag {% if e.entry.mode == 'urgent' %}mode-urgent{% else %}mode-pool{% endif %}">
+                      {% if e.entry.mode == 'urgent' %}⚡ Fast{% else %}⏳ Pool{% endif %}
+                    </span>
+                  </td>
+                  <td style="font-weight:600;color:#374151;">
+                    {{ e.qty }} <span style="font-size:.7rem;color:#9ca3af;">{{ e.unit }}s</span>
+                  </td>
+                  <td style="font-weight:600;color:#374151;">₹{{ e.unit_price|floatformat:2 }}</td>
+                  <td>
+                    {% if e.discount > 0 %}
+                    <span style="color:#10b981;font-weight:700;">−{{ e.discount|floatformat:0 }}%</span>
+                    {% else %}
+                    <span style="color:#9ca3af;">—</span>
+                    {% endif %}
+                  </td>
+                  <td style="font-weight:700;color:#111827;">₹{{ e.gross|floatformat:2|intcomma }}</td>
+                  <td style="color:#dc2626;font-weight:600;">−₹{{ e.commission|floatformat:2|intcomma }}</td>
+                  <td style="color:#10b981;font-weight:700;">₹{{ e.net_payout|floatformat:2|intcomma }}</td>
+                  <td style="color:#2563eb;font-weight:600;">₹{{ e.escrow_paid|floatformat:2|intcomma }}</td>
+                  <td style="color:#d97706;font-weight:600;">₹{{ e.balance_due|floatformat:2|intcomma }}</td>
+                  <td>
+                    <span class="status-pill
+                      {% if e.status == 'active' %}s-active
+                      {% elif e.status == 'cancelled_penalty' %}s-penalty
+                      {% else %}s-cancelled{% endif %}">
+                      {% if e.status == 'active' %}Active
+                      {% elif e.status == 'cancelled_free' %}Cancelled
+                      {% else %}Cancelled (Penalty){% endif %}
+                    </span>
+                  </td>
+                  <td style="font-size:.75rem;color:#9ca3af;white-space:nowrap;">{{ e.joined_at|date:"d M Y" }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              {# Totals footer row #}
+              <tfoot>
+                <tr style="background:#f0fdf4;border-top:2px solid #d1fae5;">
+                  <td colspan="7" style="padding:10px 14px;font-size:.75rem;font-weight:700;color:#065f46;text-transform:uppercase;letter-spacing:.4px;">Pool Totals</td>
+                  <td style="padding:10px 14px;font-weight:800;color:#111827;">₹{{ row.pool_gross|floatformat:2|intcomma }}</td>
+                  <td style="padding:10px 14px;font-weight:800;color:#dc2626;">−₹{{ row.pool_commission|floatformat:2|intcomma }}</td>
+                  <td style="padding:10px 14px;font-weight:800;color:#10b981;">₹{{ row.pool_payout|floatformat:2|intcomma }}</td>
+                  <td colspan="4"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+      </div>{# /pool-body #}
+    </div>{# /pool-card #}
+    {% endfor %}
+    </div>{# /pool-list #}
+
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-inbox"></i>
+      <p style="font-size:.95rem;font-weight:600;color:#374151;margin-bottom:4px;">No orders yet</p>
+      <p style="font-size:.82rem;">Orders will appear here as stores join pools.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+// ── Accordion toggle ──────────────────────────────────────────────────────
+function togglePool(header) {
+  const body    = header.nextElementSibling;
+  const isOpen  = header.classList.contains('open');
+  header.classList.toggle('open', !isOpen);
+  body.classList.toggle('open', !isOpen);
+}
+
+// ── Live search / filter ──────────────────────────────────────────────────
+function filterPools(query) {
+  const q     = query.toLowerCase().trim();
+  const cards = document.querySelectorAll('#pool-list .pool-card');
+  let visible = 0;
+  cards.forEach(card => {
+    const haystack = card.dataset.search || '';
+    const show     = !q || haystack.includes(q);
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  document.getElementById('pool-count').textContent = visible + ' pool' + (visible !== 1 ? 's' : '');
+}
+</script>
+{% endblock %}

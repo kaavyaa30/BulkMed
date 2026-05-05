@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Disputes — {{ factory.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fd-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 56px; }
+  .fd-hero  { background:linear-gradient(135deg,#7f1d1d,#dc2626); border-radius:16px; padding:24px 28px; margin-bottom:24px; color:#fff; }
+  .fd-hero h2 { font-size:1.3rem; font-weight:800; margin:0; }
+  .fd-hero p  { color:rgba(255,255,255,.72); font-size:.875rem; margin:5px 0 0; }
+  .s-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); overflow:hidden; margin-bottom:20px; }
+  .s-head { padding:14px 20px; display:flex; justify-content:space-between; align-items:center; }
+  .f-table th { padding:10px 16px; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; font-weight:700; border-bottom:2px solid; white-space:nowrap; }
+  .f-table td { padding:12px 16px; border-bottom:1px solid #f3f4f6; vertical-align:middle; font-size:.84rem; }
+  .f-table tbody tr:last-child td { border-bottom:none; }
+  .pill { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:99px; white-space:nowrap; }
+  .pill-open     { background:#fef2f2; color:#dc2626; }
+  .pill-payout   { background:#dcfce7; color:#16a34a; }
+  .pill-refund   { background:#f3f4f6; color:#6b7280; }
+  .locked-badge  { background:#fef9c3; color:#92400e; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; font-size:.82rem; font-weight:600; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">🏭</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu"><span class="navbar-toggler-icon"></span></button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'factory_disputes' %}"><i class="bi bi-flag me-1"></i>Disputes{% if open_count %} <span class="badge bg-danger ms-1">{{ open_count }}</span>{% endif %}</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="fd-page">
+<div class="container-fluid px-4" style="max-width:1100px;margin:0 auto;">
+
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+
+  <div class="mb-3">
+    <a href="{% url 'factory_dashboard' %}" style="font-size:.85rem;color:#6b7280;text-decoration:none;"><i class="bi bi-arrow-left me-1"></i>Back to Dashboard</a>
+  </div>
+
+  <div class="fd-hero">
+    <h2><i class="bi bi-flag-fill me-2"></i>Disputes & Returns</h2>
+    <p>{{ factory.name }} &nbsp;·&nbsp; {{ disputes|length }} total &nbsp;·&nbsp;
+      {% if open_count %}<span style="color:#fca5a5;font-weight:700;">{{ open_count }} open — payouts locked</span>{% else %}<span style="color:#bbf7d0;">No open disputes</span>{% endif %}
+    </p>
+  </div>
+
+  {% if open_count %}
+  <div class="locked-badge mb-4">
+    <i class="bi bi-lock-fill me-2"></i>
+    <strong>{{ open_count }} payout{{ open_count|pluralize }} currently on hold.</strong>
+    Funds will be released once the admin reviews and resolves each dispute. Contact <a href="mailto:support@bulkmed.in">support@bulkmed.in</a> if you have questions.
+  </div>
+  {% endif %}
+
+  <div class="s-card">
+    <div class="s-head" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);">
+      <div style="font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-flag" style="color:#fff;"></i> All Disputes
+      </div>
+      <span style="font-size:.75rem;color:rgba(255,255,255,.75);">{{ disputes|length }} record{{ disputes|length|pluralize }}</span>
+    </div>
+
+    {% if disputes %}
+    <div class="table-responsive">
+      <table class="table mb-0 f-table">
+        <thead style="background:#fef2f2;">
+          <tr>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">#</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Store</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Medicine</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Reason</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Photo</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Raised</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Status</th>
+            <th style="color:#dc2626;border-bottom-color:#fecaca;">Admin Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in disputes %}
+          <tr>
+            <td style="color:#9ca3af;font-size:.75rem;">{{ d.id }}</td>
+            <td style="font-weight:600;color:#111827;">{{ d.delivery.store.name }}</td>
+            <td style="color:#374151;">{{ d.delivery.pool.product.name }}</td>
+            <td style="max-width:220px;color:#4b5563;">{{ d.reason|truncatechars:80 }}</td>
+            <td>
+              {% if d.photo %}
+              <a href="{{ d.photo.url }}" target="_blank" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;padding:3px 8px;">
+                <i class="bi bi-image me-1"></i>View
+              </a>
+              {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+            </td>
+            <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">{{ d.raised_at|date:"d M Y, H:i" }}</td>
+            <td>
+              {% if d.status == 'open' %}
+                <span class="pill pill-open">🔒 Open — Payout Locked</span>
+              {% elif d.status == 'resolved_payout' %}
+                <span class="pill pill-payout">✅ Resolved — Payout Released</span>
+              {% else %}
+                <span class="pill pill-refund">↩ Resolved — Store Refunded</span>
+              {% endif %}
+            </td>
+            <td style="font-size:.78rem;color:#6b7280;max-width:180px;">{{ d.admin_note|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 24px;color:#9ca3af;">
+      <div style="font-size:3rem;margin-bottom:12px;">✅</div>
+      <div style="font-weight:700;color:#374151;margin-bottom:6px;">No disputes raised</div>
+      <p style="font-size:.875rem;">All deliveries have been accepted without issues.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+{% endblock %}

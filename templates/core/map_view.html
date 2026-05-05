@@ -1,0 +1,363 @@
+{% extends 'base.html' %}
+{% block title %}Supply Chain Map — BulkMed{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  .map-page { background: #f1f5f9; min-height: calc(100vh - 64px); padding: 24px 0 40px; }
+
+  /* ── Map container ── */
+  #supply-map {
+    height: 580px;
+    border-radius: 16px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 4px 20px rgba(0,0,0,.08);
+  }
+
+  /* ── Emoji markers ── */
+  .em-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 20px;
+    box-shadow: 0 3px 12px rgba(0,0,0,.25);
+    border: 2.5px solid #fff;
+    cursor: pointer;
+    transition: transform .15s;
+  }
+  .em-marker:hover { transform: scale(1.15); }
+  .em-store   { background: #eff6ff; }
+  .em-factory { background: #f0fdf4; }
+  .em-pool    { background: #fef9c3; }
+
+  /* ── Popup ── */
+  .leaflet-popup-content-wrapper {
+    border-radius: 14px;
+    box-shadow: 0 10px 32px rgba(0,0,0,.14);
+    border: none;
+    padding: 0;
+    overflow: hidden;
+  }
+  .leaflet-popup-content { margin: 0; min-width: 220px; }
+  .leaflet-popup-tip-container { display: none; }
+
+  .map-popup-header {
+    padding: 12px 16px 10px;
+    font-weight: 700;
+    font-size: .95rem;
+    color: #111827;
+    border-bottom: 1px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .map-popup-body { padding: 10px 16px 14px; font-size: .82rem; color: #4b5563; }
+  .map-popup-row  { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .map-popup-lbl  { color: #9ca3af; font-size: .75rem; }
+  .map-popup-val  { font-weight: 600; color: #111827; }
+  .map-popup-link {
+    display: block; margin-top: 10px;
+    background: #2563eb; color: #fff;
+    text-align: center; padding: 8px;
+    border-radius: 8px; font-size: .8rem;
+    font-weight: 600; text-decoration: none;
+    transition: background .15s;
+  }
+  .map-popup-link:hover { background: #1d4ed8; color: #fff; }
+  .map-popup-link.green { background: #059669; }
+  .map-popup-link.green:hover { background: #047857; }
+
+  /* ── Legend ── */
+  .map-legend {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px 18px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-dot {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 6px rgba(0,0,0,.15);
+    flex-shrink: 0;
+  }
+
+  /* ── Stats strip ── */
+  .map-stat {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 14px 18px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .map-stat .val { font-size: 1.6rem; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+  .map-stat .lbl { font-size: .72rem; color: #6b7280; font-weight: 500; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+        {% if user.is_staff %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        {% endif %}
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="map-page">
+  <div class="container-fluid px-4" style="max-width:1300px;margin:0 auto;">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+      <div>
+        <h2 style="font-size:1.5rem;font-weight:800;color:#111827;margin:0;">
+          <i class="bi bi-globe-asia-australia text-primary me-2"></i>Supply Chain Logistics Map
+        </h2>
+        <p style="color:#6b7280;font-size:.875rem;margin:4px 0 0;">
+          Live view of factories, pharmacies, and active order pools
+          {% if store %}&nbsp;·&nbsp; <strong>{{ store.city }}</strong>{% endif %}
+        </p>
+      </div>
+      <!-- Stats strip -->
+      <div class="d-flex gap-3 flex-wrap">
+        <div class="map-stat">
+          <div class="val" style="color:#2563eb;">{{ factory_count }}</div>
+          <div class="lbl">🏭 Factories</div>
+        </div>
+        <div class="map-stat">
+          <div class="val" style="color:#059669;">{{ store_count }}</div>
+          <div class="lbl">🏥 Pharmacies</div>
+        </div>
+        <div class="map-stat">
+          <div class="val" style="color:#d97706;">{{ pool_count }}</div>
+          <div class="lbl">💊 Open Pools</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <!-- Map -->
+      <div class="col-lg-9">
+        <div id="supply-map"></div>
+      </div>
+
+      <!-- Legend + info -->
+      <div class="col-lg-3 d-flex flex-column gap-3">
+        <div class="map-legend">
+          <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:12px;text-transform:uppercase;letter-spacing:.5px;">Map Legend</div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#f0fdf4;">🏭</div>
+            <div>
+              <div>Factory / Warehouse</div>
+              <div style="font-size:.72rem;color:#9ca3af;font-weight:400;">Medicine manufacturers</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#eff6ff;">🏥</div>
+            <div>
+              <div>Medical Store</div>
+              <div style="font-size:.72rem;color:#9ca3af;font-weight:400;">Verified pharmacies</div>
+            </div>
+          </div>
+          <div class="legend-item">
+            <div class="legend-dot" style="background:#fef9c3;">💊</div>
+            <div>
+              <div>Active Pool</div>
+              <div style="font-size:.72rem;color:#9ca3af;font-weight:400;">Open group orders</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="map-legend">
+          <div style="font-weight:700;font-size:.82rem;color:#374151;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;">Quick Actions</div>
+          <a href="{% url 'pool_list' %}" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#eff6ff;border-radius:10px;text-decoration:none;color:#2563eb;font-size:.82rem;font-weight:600;margin-bottom:8px;">
+            <i class="bi bi-collection"></i> Browse Open Pools
+          </a>
+          <a href="{% url 'search_medicines' %}" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#f0fdf4;border-radius:10px;text-decoration:none;color:#059669;font-size:.82rem;font-weight:600;">
+            <i class="bi bi-search"></i> Search Medicines
+          </a>
+        </div>
+
+        <div class="map-legend" style="font-size:.78rem;color:#6b7280;line-height:1.6;">
+          <i class="bi bi-info-circle me-1"></i>
+          Only entities with GPS coordinates are shown. Pools without exact coordinates are placed near their city centre.
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const POOL_DATA    = {{ pool_data|safe }};
+const FACTORY_DATA = {{ factory_data|safe }};
+const STORE_DATA   = {{ store_data|safe }};
+const MAP_CENTRE   = {{ map_centre|safe }};
+
+// ── Map init ───────────────────────────────────────────────────────────────
+const map = L.map('supply-map', { zoomControl: true }).setView(MAP_CENTRE, 11);
+
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  subdomains: 'abcd', maxZoom: 19,
+  attribution: '© OpenStreetMap © CARTO',
+}).addTo(map);
+
+// ── Icon factory ───────────────────────────────────────────────────────────
+function makeIcon(emoji, bgClass) {
+  return L.divIcon({
+    html: `<div class="em-marker ${bgClass}">${emoji}</div>`,
+    className: '',
+    iconSize:   [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor:[0, -22],
+  });
+}
+
+const factoryIcon = makeIcon('🏭', 'em-factory');
+const storeIcon   = makeIcon('🏥', 'em-store');
+const poolIcon    = makeIcon('💊', 'em-pool');
+
+// ── City coordinate fallback for pools ────────────────────────────────────
+const CITY_COORDS = {
+  'Ahmedabad':  [23.0225, 72.5714], 'Mumbai':    [19.0760, 72.8777],
+  'Delhi':      [28.6139, 77.2090], 'Bangalore': [12.9716, 77.5946],
+  'Surat':      [21.1702, 72.8311], 'Pune':      [18.5204, 73.8567],
+  'Chennai':    [13.0827, 80.2707], 'Hyderabad': [17.3850, 78.4867],
+  'Kolkata':    [22.5726, 88.3639], 'Jaipur':    [26.9124, 75.7873],
+};
+const jitter = () => (Math.random() - 0.5) * 0.06;
+
+// ── Layer groups (for toggling) ────────────────────────────────────────────
+const factoryLayer = L.layerGroup().addTo(map);
+const storeLayer   = L.layerGroup().addTo(map);
+const poolLayer    = L.layerGroup().addTo(map);
+
+// ── Plot factories ─────────────────────────────────────────────────────────
+FACTORY_DATA.forEach(f => {
+  const m = L.marker([f.lat, f.lng], { icon: factoryIcon }).addTo(factoryLayer);
+  m.bindPopup(`
+    <div class="map-popup-header" style="background:#f0fdf4;">
+      🏭 <span>${f.name}</span>
+    </div>
+    <div class="map-popup-body">
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">Type</span>
+        <span class="map-popup-val" style="color:#059669;">Factory / Warehouse</span>
+      </div>
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">City</span>
+        <span class="map-popup-val">${f.city || '—'}</span>
+      </div>
+      ${f.contact ? `<div class="map-popup-row"><span class="map-popup-lbl">Contact</span><span class="map-popup-val">${f.contact}</span></div>` : ''}
+      <a href="/factory/" class="map-popup-link green">View Factory →</a>
+    </div>
+  `);
+});
+
+// ── Plot stores ────────────────────────────────────────────────────────────
+STORE_DATA.forEach(s => {
+  const m = L.marker([s.lat, s.lng], { icon: storeIcon }).addTo(storeLayer);
+  m.bindPopup(`
+    <div class="map-popup-header" style="background:#eff6ff;">
+      🏥 <span>${s.name}</span>
+    </div>
+    <div class="map-popup-body">
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">Type</span>
+        <span class="map-popup-val" style="color:#2563eb;">Medical Store</span>
+      </div>
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">City</span>
+        <span class="map-popup-val">${s.city || '—'}</span>
+      </div>
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">Status</span>
+        <span class="map-popup-val" style="color:#16a34a;">✅ Verified</span>
+      </div>
+    </div>
+  `);
+});
+
+// ── Plot pools ─────────────────────────────────────────────────────────────
+POOL_DATA.forEach(pool => {
+  const base = CITY_COORDS[pool.city] || MAP_CENTRE;
+  const lat  = base[0] + jitter();
+  const lng  = base[1] + jitter();
+  const m    = L.marker([lat, lng], { icon: poolIcon }).addTo(poolLayer);
+
+  const expires  = new Date(pool.expires_at);
+  const diff     = expires - new Date();
+  const h        = Math.max(0, Math.floor(diff / 3600000));
+  const min      = Math.max(0, Math.floor((diff % 3600000) / 60000));
+  const nextTier = pool.next_tier[0] > 0
+    ? `<div style="font-size:.75rem;color:#0891b2;margin-top:4px;">${pool.next_tier[0]} more store(s) → ${pool.next_tier[1]}% discount</div>`
+    : '';
+
+  m.bindPopup(`
+    <div class="map-popup-header" style="background:#fef9c3;">
+      💊 <span>${pool.product}</span>
+    </div>
+    <div class="map-popup-body">
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">City</span>
+        <span class="map-popup-val">${pool.city}</span>
+      </div>
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">Stores joined</span>
+        <span class="map-popup-val">${pool.member_count} / 15</span>
+      </div>
+      <div class="map-popup-row">
+        <span class="map-popup-lbl">Discount</span>
+        <span class="map-popup-val" style="color:#16a34a;">${pool.discount}% OFF</span>
+      </div>
+      <div style="font-size:.75rem;color:#dc2626;margin-top:4px;">⏱ ${h}h ${min}m left</div>
+      ${nextTier}
+      <a href="/pools/${pool.id}/" class="map-popup-link">Join Pool →</a>
+    </div>
+  `);
+});
+
+// ── Layer toggle controls ──────────────────────────────────────────────────
+L.control.layers(null, {
+  '🏭 Factories':  factoryLayer,
+  '🏥 Pharmacies': storeLayer,
+  '💊 Open Pools': poolLayer,
+}, { position: 'topright', collapsed: false }).addTo(map);
+</script>
+{% endblock %}

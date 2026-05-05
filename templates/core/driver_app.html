@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#059669">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="BulkMed Driver">
+  <title>BulkMed Driver — Delivery #{{ delivery.id }}</title>
+
+  <!-- PWA manifest -->
+  <link rel="manifest" href="/driver/manifest.json">
+
+  <!-- Leaflet map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green:  #059669;
+      --green2: #047857;
+      --red:    #dc2626;
+      --amber:  #d97706;
+      --dark:   #0f172a;
+      --card:   #1e293b;
+      --border: #334155;
+      --text:   #f1f5f9;
+      --muted:  #94a3b8;
+      --radius: 16px;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--dark);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+
+    /* ── Layout ── */
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;          /* dynamic viewport height — handles mobile chrome bar */
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ── */
+    .header {
+      padding: 16px 20px 12px;
+      padding-top: max(16px, env(safe-area-inset-top));
+      background: var(--dark);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand { font-size: .75rem; font-weight: 700; color: var(--green); letter-spacing: .5px; text-transform: uppercase; }
+    .delivery-id { font-size: .72rem; color: var(--muted); }
+    .status-chip {
+      font-size: .72rem; font-weight: 700; padding: 4px 12px;
+      border-radius: 99px; background: var(--card); color: var(--muted);
+      border: 1px solid var(--border);
+      transition: all .3s;
+    }
+    .status-chip.active  { background: #064e3b; color: #6ee7b7; border-color: var(--green); }
+    .status-chip.error   { background: #450a0a; color: #fca5a5; border-color: var(--red); }
+    .status-chip.paused  { background: #451a03; color: #fcd34d; border-color: var(--amber); }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      min-height: 0;           /* critical for flex children with Leaflet */
+      z-index: 0;
+    }
+
+    /* ── Bottom sheet ── */
+    .sheet {
+      flex-shrink: 0;
+      background: var(--dark);
+      border-top: 1px solid var(--border);
+      padding: 16px 20px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
+    /* ── Stats row ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      text-align: center;
+    }
+    .stat-val { font-size: 1.3rem; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+    .stat-lbl { font-size: .62rem; color: var(--muted); margin-top: 3px; font-weight: 500; text-transform: uppercase; letter-spacing: .3px; }
+
+    /* ── Delivery info ── */
+    .delivery-info {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      margin-bottom: 14px;
+      font-size: .82rem;
+    }
+    .delivery-info .row { display: flex; justify-content: space-between; padding: 4px 0; }
+    .delivery-info .row:not(:last-child) { border-bottom: 1px solid var(--border); }
+    .delivery-info .lbl { color: var(--muted); }
+    .delivery-info .val { font-weight: 600; color: var(--text); text-align: right; max-width: 60%; }
+
+    /* ── Main CTA button ── */
+    .btn-start {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      letter-spacing: .2px;
+    }
+    .btn-start.idle    { background: var(--green);  color: #fff; }
+    .btn-start.idle:active { background: var(--green2); transform: scale(.98); }
+    .btn-start.running { background: var(--red);    color: #fff; }
+    .btn-start.running:active { background: #b91c1c; transform: scale(.98); }
+    .btn-start:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Log strip ── */
+    .log-strip {
+      margin-top: 10px;
+      font-size: .72rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 18px;
+    }
+    .log-strip.ok    { color: #6ee7b7; }
+    .log-strip.error { color: #fca5a5; }
+
+    /* ── Pulse animation ── */
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(5,150,105,.6); }
+      70%  { box-shadow: 0 0 0 10px rgba(5,150,105,0); }
+      100% { box-shadow: 0 0 0 0 rgba(5,150,105,0); }
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+      margin-right: 6px;
+    }
+
+    /* ── Permission overlay ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(15,23,42,.95);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999; padding: 32px;
+      text-align: center;
+    }
+    .overlay.hidden { display: none; }
+    .overlay-icon { font-size: 3.5rem; margin-bottom: 16px; }
+    .overlay h2 { font-size: 1.2rem; font-weight: 800; margin-bottom: 8px; }
+    .overlay p  { font-size: .875rem; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+    .overlay .btn-allow {
+      background: var(--green); color: #fff; border: none;
+      padding: 14px 32px; border-radius: var(--radius);
+      font-size: .95rem; font-weight: 700; cursor: pointer;
+    }
+
+    /* ── Leaflet tiles ── */
+    .leaflet-tile { filter: none; }
+  </style>
+</head>
+<body>
+
+<!-- ── GPS permission overlay ── -->
+<div class="overlay" id="overlay">
+  <div class="overlay-icon">📍</div>
+  <h2>Location Access Required</h2>
+  <p>BulkMed Driver needs your GPS location to track this delivery in real time.<br>Your location is only shared while you are on this page.</p>
+  <button class="btn-allow" id="btn-allow">Allow Location Access</button>
+</div>
+
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-row">
+      <div>
+        <div class="brand">💊 BulkMed Driver</div>
+        <div class="delivery-id">Delivery #{{ delivery.id }} · {{ delivery.pool.product.name }}</div>
+      </div>
+      <div class="status-chip" id="status-chip">Idle</div>
+    </div>
+  </div>
+
+  <!-- Live map -->
+  <div id="map"></div>
+
+  <!-- Bottom sheet -->
+  <div class="sheet">
+
+    <!-- Stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-val" id="stat-accuracy" style="color:var(--amber);">—</div>
+        <div class="stat-lbl">Accuracy (m)</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-speed" style="color:var(--green);">—</div>
+        <div class="stat-lbl">Speed (km/h)</div>
+      </div>
+      <div class="stat">
+        <div class="stat-val" id="stat-pings" style="color:#60a5fa;">0</div>
+        <div class="stat-lbl">Pings sent</div>
+      </div>
+    </div>
+
+    <!-- Delivery info -->
+    <div class="delivery-info">
+      <div class="row">
+        <span class="lbl">Medicine</span>
+        <span class="val">{{ delivery.pool.product.name }}</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Quantity</span>
+        <span class="val">{{ delivery.quantity }} {{ delivery.pool.product.unit }}s</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Deliver to</span>
+        <span class="val">{{ delivery.store.name }}</span>
+      </div>
+      <div class="row">
+        <span class="lbl">Store address</span>
+        <span class="val">{{ delivery.store.address|truncatechars:40 }}</span>
+      </div>
+      <div class="row">
+        <span class="lbl">OTP (give to store)</span>
+        <span class="val" style="color:var(--green);font-size:1rem;letter-spacing:3px;">{{ delivery.delivery_otp }}</span>
+      </div>
+    </div>
+
+    <!-- CTA -->
+    <button class="btn-start idle" id="btn-journey" disabled>
+      <span id="btn-icon">📍</span>
+      <span id="btn-label">Acquiring GPS…</span>
+    </button>
+
+    <!-- Log -->
+    <div class="log-strip" id="log">Waiting for GPS fix…</div>
+
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const DELIVERY_ID  = {{ delivery.id }};
+const DRIVER_TOKEN = '{{ token }}';
+const UPDATE_URL   = `/delivery/${DELIVERY_ID}/location/update/?token=${DRIVER_TOKEN}`;
+const PING_MS      = 10_000;          // send GPS every 10 seconds
+const ACCURACY_WARN_M = 50;           // warn driver if accuracy > 50 m
+const STORE_LAT    = {{ delivery.store.latitude|default:"null" }};
+const STORE_LNG    = {{ delivery.store.longitude|default:"null" }};
+const STORE_NAME   = '{{ delivery.store.name|escapejs }}';
+
+// ── State ─────────────────────────────────────────────────────────────────
+let watchId      = null;   // navigator.geolocation.watchPosition handle
+let intervalId   = null;   // setInterval handle for 30s pings
+let lastPosition = null;   // most recent GeolocationPosition
+let pingCount    = 0;
+let isRunning    = false;
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const overlay    = document.getElementById('overlay');
+const btnAllow   = document.getElementById('btn-allow');
+const btnJourney = document.getElementById('btn-journey');
+const btnIcon    = document.getElementById('btn-icon');
+const btnLabel   = document.getElementById('btn-label');
+const statusChip = document.getElementById('status-chip');
+const logEl      = document.getElementById('log');
+const statAcc    = document.getElementById('stat-accuracy');
+const statSpeed  = document.getElementById('stat-speed');
+const statPings  = document.getElementById('stat-pings');
+
+// ── Leaflet map ───────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: false, attributionControl: false })
+              .setView([20.5937, 78.9629], 5);   // India overview until GPS fix
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  subdomains: 'abc', maxZoom: 19,
+  attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+}).addTo(map);
+
+// Zoom control — top-right so it doesn't clash with the header
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+// Truck marker (driver's live position)
+const truckIcon = L.divIcon({
+  html: `<div style="background:#059669;border-radius:50%;width:44px;height:44px;
+           display:flex;align-items:center;justify-content:center;
+           box-shadow:0 0 0 6px rgba(5,150,105,.3);border:3px solid #fff;font-size:20px;">🚚</div>`,
+  className: '', iconSize: [44, 44], iconAnchor: [22, 22],
+});
+
+// Store destination marker
+const storeIcon = L.divIcon({
+  html: `<div style="background:#dc2626;border-radius:50% 50% 50% 0;width:36px;height:36px;
+           transform:rotate(-45deg);box-shadow:0 3px 10px rgba(220,38,38,.5);
+           border:3px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;">
+           <span style="transform:rotate(45deg)">🏪</span></div>`,
+  className: '', iconSize: [36, 44], iconAnchor: [18, 44],
+});
+
+let truckMarker = null;
+let trailLine   = L.polyline([], { color: '#059669', weight: 4, opacity: .7 }).addTo(map);
+let storeMarker = null;
+
+// Place store marker if coordinates are available
+if (STORE_LAT && STORE_LNG) {
+  storeMarker = L.marker([STORE_LAT, STORE_LNG], { icon: storeIcon })
+    .addTo(map)
+    .bindPopup(`<b>🏪 ${STORE_NAME}</b><br>Delivery destination`);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function setLog(msg, type = '') {
+  logEl.textContent = msg;
+  logEl.className = 'log-strip ' + type;
+}
+
+function setStatus(label, type = '') {
+  statusChip.textContent = label;
+  statusChip.className   = 'status-chip ' + type;
+}
+
+function mpsToKmh(mps) {
+  return mps != null ? Math.round(mps * 3.6) : 0;
+}
+
+function updateMap(lat, lng) {
+  if (!truckMarker) {
+    truckMarker = L.marker([lat, lng], { icon: truckIcon, zIndexOffset: 1000 }).addTo(map);
+    map.setView([lat, lng], 15);
+  } else {
+    truckMarker.setLatLng([lat, lng]);
+  }
+  // Append to trail
+  const trail = trailLine.getLatLngs();
+  trail.push([lat, lng]);
+  trailLine.setLatLngs(trail);
+  // Keep truck centred while running
+  if (isRunning) map.panTo([lat, lng], { animate: true, duration: 1 });
+}
+
+// ── Core: send GPS to server ───────────────────────────────────────────────
+async function pushLocation() {
+  if (!lastPosition) return;
+
+  const { latitude, longitude, speed, accuracy } = lastPosition.coords;
+  const speed_kmh = mpsToKmh(speed);
+
+  // Update map immediately (optimistic — don't wait for server)
+  updateMap(latitude, longitude);
+  statAcc.textContent   = Math.round(accuracy);
+  statSpeed.textContent = speed_kmh;
+
+  // ── Accuracy warning ─────────────────────────────────────────────────
+  // If accuracy is worse than 50 m, warn the driver but still send the ping.
+  if (accuracy > ACCURACY_WARN_M) {
+    setLog(`⚠ Low accuracy (${Math.round(accuracy)} m) — turn on High Accuracy GPS`, 'error');
+    statAcc.style.color = 'var(--red)';
+  } else {
+    statAcc.style.color = 'var(--amber)';
+  }
+
+  try {
+    const res = await fetch(UPDATE_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ latitude, longitude, speed_kmh }),
+    });
+
+    if (res.ok) {
+      // ── Ping counter: only increment after server confirms receipt ────
+      pingCount++;
+      statPings.textContent = pingCount;
+      const now = new Date().toLocaleTimeString('en-IN', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+      });
+      // Only overwrite the accuracy warning if accuracy is acceptable
+      if (accuracy <= ACCURACY_WARN_M) {
+        setLog(`✓ Ping ${pingCount} sent at ${now}`, 'ok');
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      setLog(`⚠ Server error: ${err.error || res.status}`, 'error');
+    }
+  } catch (e) {
+    setLog('⚠ Network error — will retry in 10s', 'error');
+  }
+}
+
+// ── Geolocation watch ─────────────────────────────────────────────────────
+function startWatch() {
+  if (!navigator.geolocation) {
+    setLog('GPS not supported on this device.', 'error');
+    return;
+  }
+  watchId = navigator.geolocation.watchPosition(
+    pos => {
+      lastPosition = pos;
+      // Update map in real time (even between 30s pings)
+      updateMap(pos.coords.latitude, pos.coords.longitude);
+      statAcc.textContent   = Math.round(pos.coords.accuracy);
+      statSpeed.textContent = mpsToKmh(pos.coords.speed);
+      // Enable button once we have a fix
+      if (!isRunning) {
+        btnJourney.disabled = false;
+        btnLabel.textContent = 'Start Journey';
+        btnIcon.textContent  = '🚀';
+        setLog('GPS fix acquired. Ready to start.', 'ok');
+      }
+    },
+    err => {
+      const msgs = {
+        1: 'Location permission denied.',
+        2: 'GPS signal unavailable.',
+        3: 'GPS timed out.',
+      };
+      setLog(msgs[err.code] || 'GPS error.', 'error');
+      setStatus('GPS Error', 'error');
+    },
+    {
+      enableHighAccuracy: true,
+      timeout:            15_000,
+      maximumAge:         5_000,
+    }
+  );
+}
+
+function stopWatch() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+  }
+}
+
+// ── Journey start / stop ──────────────────────────────────────────────────
+function startJourney() {
+  if (!lastPosition) {
+    setLog('No GPS fix yet. Please wait…', 'error');
+    return;
+  }
+  isRunning = true;
+
+  // ── Send first ping immediately on button click ───────────────────────
+  // This is the fix for "0 Pings Sent" — the user sees a ping the instant
+  // they tap Start, not 10 seconds later.
+  pushLocation();
+
+  // Then continue pinging every 10 seconds
+  intervalId = setInterval(pushLocation, PING_MS);
+
+  // Update UI
+  btnJourney.className  = 'btn-start running';
+  btnIcon.textContent   = '⏹';
+  btnLabel.textContent  = 'Stop Journey';
+  setStatus('● Live', 'active');
+
+  // Prevent screen sleep on supported browsers
+  if ('wakeLock' in navigator) {
+    navigator.wakeLock.request('screen').catch(() => {});
+  }
+}
+
+function stopJourney() {
+  isRunning = false;
+  clearInterval(intervalId);
+  intervalId = null;
+
+  btnJourney.className  = 'btn-start idle';
+  btnIcon.textContent   = '📍';
+  btnLabel.textContent  = 'Resume Journey';
+  setStatus('Paused', 'paused');
+  setLog('Journey paused. Tap Resume to continue sending location.', '');
+}
+
+btnJourney.addEventListener('click', () => {
+  if (isRunning) stopJourney();
+  else           startJourney();
+});
+
+// ── Permission flow ───────────────────────────────────────────────────────
+function requestPermissionAndStart() {
+  overlay.classList.add('hidden');
+  setLog('Acquiring GPS fix…');
+  startWatch();
+}
+
+// Check if permission already granted — skip overlay if so
+if (navigator.permissions) {
+  navigator.permissions.query({ name: 'geolocation' }).then(result => {
+    if (result.state === 'granted') {
+      requestPermissionAndStart();
+    } else {
+      overlay.classList.remove('hidden');
+    }
+    result.onchange = () => {
+      if (result.state === 'granted') requestPermissionAndStart();
+    };
+  });
+} else {
+  // Fallback: show overlay, let user tap
+  overlay.classList.remove('hidden');
+}
+
+btnAllow.addEventListener('click', requestPermissionAndStart);
+
+// ── Visibility change — pause/resume pings when tab is hidden ─────────────
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && isRunning) {
+    // Tab hidden — keep watchPosition running but pause interval
+    // (background fetch is unreliable on mobile; watchPosition keeps GPS warm)
+    clearInterval(intervalId);
+    intervalId = null;
+  } else if (!document.hidden && isRunning) {
+    // Tab visible again — resume interval and send immediately
+    pushLocation();
+    intervalId = setInterval(pushLocation, PING_MS);  // 10s
+  }
+});
+
+// ── Service Worker registration ───────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/driver/sw.js', { scope: '/driver/' })
+    .catch(() => {}); // non-fatal
+}
+</script>
+</body>
+</html>

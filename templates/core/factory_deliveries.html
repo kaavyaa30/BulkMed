@@ -1,0 +1,243 @@
+﻿{% extends "base.html" %}
+{% block title %}Deliveries — {{ factory.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .fac-page{background:#f1f5f9;min-height:calc(100vh - 64px);padding:28px 0 56px;}
+  .page-hd{margin-bottom:24px;}
+  .page-hd h2{font-size:1.4rem;font-weight:800;color:#111827;letter-spacing:-.5px;margin:0;}
+  .page-hd p{color:#6b7280;font-size:.875rem;margin:4px 0 0;}
+  .tab-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px;}
+  .tab-btn{padding:6px 16px;border-radius:99px;font-size:.8rem;font-weight:600;border:1.5px solid #e5e7eb;background:#fff;color:#6b7280;text-decoration:none;transition:all .15s;}
+  .tab-btn:hover{border-color:#0891b2;color:#0891b2;}
+  .tab-btn.active{background:#0891b2;border-color:#0891b2;color:#fff;}
+  .tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:50%;font-size:.65rem;font-weight:700;background:rgba(255,255,255,.3);margin-left:4px;padding:0 3px;}
+  .s-card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;}
+  .s-head{padding:14px 20px;background:linear-gradient(135deg,#0c4a6e,#0891b2);display:flex;justify-content:space-between;align-items:center;}
+  .s-title{font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;}
+  .s-icon{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .f-table th{padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;background:#ecfeff;color:#0891b2;border-bottom:2px solid #a5f3fc;white-space:nowrap;}
+  .f-table td{padding:12px 16px;border-bottom:1px solid #f3f4f6;vertical-align:middle;font-size:.84rem;}
+  .f-table tbody tr:last-child td{border-bottom:none;}
+  .f-table tbody tr:hover{background:#f9fafb;}
+  .pill{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:99px;white-space:nowrap;}
+  .pill-pending   {background:#f3f4f6;color:#6b7280;}
+  .pill-dispatched{background:#dbeafe;color:#1d4ed8;}
+  .pill-delivered {background:#dcfce7;color:#16a34a;}
+  .pill-failed    {background:#fef2f2;color:#dc2626;}
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">🏭</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_products' %}"><i class="bi bi-capsule me-1"></i>Products</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="fac-page">
+<div class="container-fluid px-4" style="max-width:1200px;margin:0 auto;">
+
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">
+    {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+
+  <div class="page-hd">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <h2><i class="bi bi-truck me-2" style="color:#0891b2;"></i>Deliveries</h2>
+        <p>All shipments dispatched from {{ factory.name }}</p>
+      </div>
+      <a href="{% url 'factory_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>Dashboard
+      </a>
+    </div>
+  </div>
+
+  <!-- Status filter tabs -->
+  <div class="tab-bar">
+    <a href="{% url 'factory_deliveries' %}" class="tab-btn {% if not status_filter %}active{% endif %}">
+      All <span class="tab-count" style="background:#0891b2;color:#fff;">{{ deliveries|length }}</span>
+    </a>
+    <a href="?status=pending" class="tab-btn {% if status_filter == 'pending' %}active{% endif %}"
+       style="{% if status_filter == 'pending' %}background:#6b7280;border-color:#6b7280;{% endif %}">
+      ⏳ Pending{% if status_counts.pending %}<span class="tab-count">{{ status_counts.pending }}</span>{% endif %}
+    </a>
+    <a href="?status=dispatched" class="tab-btn {% if status_filter == 'dispatched' %}active{% endif %}"
+       style="{% if status_filter == 'dispatched' %}background:#1d4ed8;border-color:#1d4ed8;{% endif %}">
+      🚚 Dispatched{% if status_counts.dispatched %}<span class="tab-count">{{ status_counts.dispatched }}</span>{% endif %}
+    </a>
+    <a href="?status=delivered" class="tab-btn {% if status_filter == 'delivered' %}active{% endif %}"
+       style="{% if status_filter == 'delivered' %}background:#16a34a;border-color:#16a34a;{% endif %}">
+      ✅ Delivered{% if status_counts.delivered %}<span class="tab-count">{{ status_counts.delivered }}</span>{% endif %}
+    </a>
+    <a href="?status=failed" class="tab-btn {% if status_filter == 'failed' %}active{% endif %}"
+       style="{% if status_filter == 'failed' %}background:#dc2626;border-color:#dc2626;{% endif %}">
+      ❌ Failed{% if status_counts.failed %}<span class="tab-count">{{ status_counts.failed }}</span>{% endif %}
+    </a>
+  </div>
+
+  <!-- Deliveries table -->
+  <div class="s-card">
+    <div class="s-head">
+      <div class="s-title">
+        <div class="s-icon"><i class="bi bi-truck" style="color:#fff;"></i></div>
+        Delivery Records
+      </div>
+      <span style="font-size:.75rem;color:rgba(255,255,255,.75);">
+        {{ deliveries|length }} record{{ deliveries|length|pluralize }}
+      </span>
+    </div>
+
+    {% if deliveries %}
+    <div class="table-responsive">
+      <table class="table mb-0 f-table" id="tbl-deliveries" data-paginate="5">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Medicine</th>
+            <th>Store</th>
+            <th>City</th>
+            <th>Qty</th>
+            <th>Method</th>
+            <th>Waybill / Tracking</th>
+            <th>Status</th>
+            <th>OTP</th>
+            <th>Dispatched</th>
+            <th>Est. Arrival</th>
+            <th>Delivered</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in deliveries %}
+          <tr>
+            <td style="color:#9ca3af;font-size:.75rem;">{{ d.id }}</td>
+            <td style="font-weight:600;color:#111827;">{{ d.pool.product.name }}</td>
+            <td style="color:#374151;">{{ d.store.name }}</td>
+            <td style="color:#6b7280;">{{ d.store.city }}</td>
+            <td>{{ d.quantity }} {{ d.pool.product.unit }}s</td>
+
+            {# ── Delivery method ── #}
+            <td>
+              {% if d.delivery_method == '3pl' %}
+                <span class="pill" style="background:#ede9fe;color:#7c3aed;font-size:.68rem;">
+                  📦 {{ d.logistics_partner|default:"3PL" }}
+                </span>
+                {% if d.shipping_cost > 0 %}
+                <div style="font-size:.68rem;color:#9ca3af;margin-top:2px;">₹{{ d.shipping_cost }}</div>
+                {% endif %}
+              {% else %}
+                <span class="pill" style="background:#ecfeff;color:#0891b2;font-size:.68rem;">🚚 Local</span>
+              {% endif %}
+            </td>
+
+            {# ── Waybill / tracking ID ── #}
+            <td>
+              {% if d.waybill_id %}
+                <code style="font-size:.78rem;color:#7c3aed;font-weight:700;">{{ d.waybill_id }}</code>
+                {% if d.shipping_label_url %}
+                <br>
+                <a href="{{ d.shipping_label_url }}" target="_blank"
+                   style="font-size:.68rem;color:#2563eb;">
+                  <i class="bi bi-tag me-1"></i>Label PDF
+                </a>
+                {% endif %}
+              {% else %}
+                <span style="color:#d1d5db;font-size:.78rem;">—</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if d.status == 'dispatched' %}
+                <span class="pill pill-dispatched">🚚 Dispatched</span>
+              {% elif d.status == 'delivered' %}
+                <span class="pill pill-delivered">✅ Delivered</span>
+              {% elif d.status == 'failed' %}
+                <span class="pill pill-failed">❌ Failed</span>
+              {% else %}
+                <span class="pill pill-pending">⏳ Pending</span>
+              {% endif %}
+            </td>
+            <td>
+              <code style="font-size:.82rem;color:#059669;font-weight:700;">{{ d.delivery_otp }}</code>
+            </td>
+            <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">
+              {{ d.dispatched_at|date:"d M, H:i"|default:"—" }}
+            </td>
+            <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">
+              {{ d.estimated_arrival|date:"d M, H:i"|default:"—" }}
+            </td>
+            <td style="font-size:.78rem;color:#059669;white-space:nowrap;">
+              {{ d.delivered_at|date:"d M, H:i"|default:"—" }}
+            </td>
+            <td>
+              {% if d.status == 'dispatched' or d.status == 'delivered' %}
+              <div class="d-flex align-items-center" style="gap:4px;flex-wrap:nowrap;">
+                <a href="{% url 'track_delivery' d.id %}" class="btn btn-sm btn-outline-primary"
+                   style="font-size:.72rem;padding:4px 10px;">
+                  🗺️ Track
+                </a>
+                {% if d.status == 'dispatched' %}
+                <a href="{% url 'driver_app' d.id %}?token={{ d.driver_token }}"
+                   target="_blank"
+                   class="btn btn-sm btn-outline-secondary"
+                   style="font-size:.72rem;padding:4px 10px;"
+                   title="Share with driver">
+                  📱 Driver
+                </a>
+                {% endif %}
+                {% if d.status == 'delivered' %}
+                  {% with fo=d.pool.factory_order %}
+                  {% if fo %}
+                  <a href="{% url 'download_invoice' fo.id %}"
+                     class="btn btn-sm btn-outline-success"
+                     style="font-size:.72rem;padding:4px 10px;">
+                    <i class="bi bi-file-earmark-pdf"></i> Invoice
+                  </a>
+                  {% endif %}
+                  {% endwith %}
+                {% endif %}
+              </div>
+              {% else %}
+              <span style="color:#d1d5db;font-size:.78rem;">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:56px 24px;color:#9ca3af;">
+      <div style="font-size:3rem;margin-bottom:12px;">🚚</div>
+      <p style="font-size:.9rem;">
+        No deliveries{% if status_filter %} with status "{{ status_filter }}"{% endif %} yet.
+      </p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+</div>
+{% endblock %}

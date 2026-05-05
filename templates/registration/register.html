@@ -1,0 +1,265 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — BulkMed</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="{% static 'css/bulkmed.css' %}" rel="stylesheet">
+  <style>
+    body { background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; font-family: 'Inter', sans-serif; }
+
+    .reg-card { background: #fff; border-radius: 24px; box-shadow: 0 24px 64px rgba(0,0,0,.25); width: 100%; max-width: 560px; overflow: hidden; }
+
+    .reg-header { background: linear-gradient(135deg, #0f172a, #1e3a8a); padding: 32px 36px 28px; text-align: center; }
+    .reg-logo { font-size: 1.6rem; font-weight: 800; color: #fff; letter-spacing: -.5px; margin-bottom: 4px; }
+    .reg-logo span { color: #38bdf8; }
+    .reg-subtitle { font-size: .82rem; color: rgba(255,255,255,.65); margin: 0; }
+
+    .reg-body { padding: 32px 36px; }
+
+    /* Account type selector */
+    .type-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+    .type-card { border: 2px solid #e5e7eb; border-radius: 14px; padding: 18px 16px; cursor: pointer; transition: all .18s; text-align: center; position: relative; }
+    .type-card:hover { border-color: #2563eb; background: #eff6ff; }
+    .type-card.selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+    .type-card input[type=radio] { position: absolute; opacity: 0; width: 0; height: 0; }
+    .type-icon { font-size: 2rem; margin-bottom: 8px; display: block; }
+    .type-label { font-weight: 700; font-size: .9rem; color: #111827; display: block; }
+    .type-desc { font-size: .72rem; color: #6b7280; margin-top: 3px; display: block; }
+    .type-card.selected .type-label { color: #1d4ed8; }
+
+    /* Form fields */
+    .form-section { margin-bottom: 20px; }
+    .form-section-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: #9ca3af; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .form-section-title::after { content: ''; flex: 1; height: 1px; background: #f3f4f6; }
+    .form-label { font-size: .82rem; font-weight: 600; color: #374151; margin-bottom: 5px; }
+    .form-control { border-radius: 10px; border: 1.5px solid #e5e7eb; padding: 10px 14px; font-size: .875rem; transition: border-color .15s, box-shadow .15s; }
+    .form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.12); outline: none; }
+    .input-icon-wrap { position: relative; }
+    .input-icon-wrap .bi { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #9ca3af; font-size: .9rem; }
+    .input-icon-wrap .form-control { padding-left: 36px; }
+
+    .license-badge { display: inline-flex; align-items: center; gap: 5px; background: #fef3c7; border: 1px solid #fde68a; border-radius: 99px; padding: 3px 10px; font-size: .7rem; font-weight: 600; color: #92400e; margin-bottom: 8px; }
+
+    .btn-register { background: linear-gradient(135deg, #1d4ed8, #2563eb); border: none; border-radius: 12px; padding: 13px; font-size: .95rem; font-weight: 700; color: #fff; width: 100%; transition: all .18s; }
+    .btn-register:hover { background: linear-gradient(135deg, #1e40af, #1d4ed8); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,99,235,.35); }
+
+    .reg-footer { text-align: center; padding: 0 36px 28px; font-size: .82rem; color: #6b7280; }
+    .reg-footer a { color: #2563eb; font-weight: 600; text-decoration: none; }
+    .reg-footer a:hover { text-decoration: underline; }
+
+    .error-list { background: #fef2f2; border: 1px solid #fecaca; border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; font-size: .8rem; color: #dc2626; }
+    .error-list ul { margin: 0; padding-left: 16px; }
+  </style>
+</head>
+<body>
+
+<div class="reg-card">
+  <div class="reg-header">
+    <div class="reg-logo">💊 Bulk<span>Med</span></div>
+    <p class="reg-subtitle">B2B Bulk Medicine Procurement Platform</p>
+  </div>
+
+  <div class="reg-body">
+    <form method="post" id="reg-form">
+      {% csrf_token %}
+
+      <!-- Account Type -->
+      <div class="form-section">
+        <div class="form-section-title">I am registering as</div>
+        <div class="type-grid">
+          <label class="type-card {% if form.account_type.value == 'store' or not form.account_type.value %}selected{% endif %}" id="card-store">
+            <input type="radio" name="account_type" value="store" {% if form.account_type.value == 'store' or not form.account_type.value %}checked{% endif %}>
+            <span class="type-icon">🏪</span>
+            <span class="type-label">Medical Store</span>
+            <span class="type-desc">Pharmacy / Retailer</span>
+          </label>
+          <label class="type-card {% if form.account_type.value == 'factory' %}selected{% endif %}" id="card-factory">
+            <input type="radio" name="account_type" value="factory" {% if form.account_type.value == 'factory' %}checked{% endif %}>
+            <span class="type-icon">🏭</span>
+            <span class="type-label">Factory</span>
+            <span class="type-desc">Manufacturer / Supplier</span>
+          </label>
+        </div>
+      </div>
+
+      {% if form.non_field_errors or form.errors %}
+      <div class="error-list">
+        <ul>
+          {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          {% for field in form %}{% for error in field.errors %}<li><strong>{{ field.label }}:</strong> {{ error }}</li>{% endfor %}{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <!-- Business Info -->
+      <div class="form-section">
+        <div class="form-section-title biz-section-title">Business Information</div>
+        <div class="mb-3">
+          <label class="form-label">Business Name <span style="color:#ef4444;">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-building"></i>
+            <input type="text" name="business_name" class="form-control" placeholder="e.g. Apollo Pharmacy" value="{{ form.business_name.value|default:'' }}" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">
+            Drug License Number <span style="color:#ef4444;">*</span>
+            <span class="license-badge ms-1"><i class="bi bi-shield-check"></i> Required for verification</span>
+          </label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-card-text"></i>
+            <input type="text" name="license_no" class="form-control" placeholder="e.g. MH-MUM-123456" value="{{ form.license_no.value|default:'' }}" required>
+          </div>
+          <div style="font-size:.72rem;color:#9ca3af;margin-top:5px;"><i class="bi bi-info-circle me-1"></i>Your license will be verified by our team before your account is activated.</div>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Contact Number <span style="color:#ef4444;">*</span></label>
+            <div class="input-icon-wrap">
+              <i class="bi bi-telephone"></i>
+              <input type="text" name="contact" class="form-control" placeholder="10-digit number" value="{{ form.contact.value|default:'' }}" required>
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">City <span style="color:#ef4444;">*</span></label>
+            <div class="input-icon-wrap">
+              <i class="bi bi-geo-alt"></i>
+              <input type="text" name="city" class="form-control" placeholder="e.g. Mumbai" value="{{ form.city.value|default:'' }}" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account Credentials -->
+      <div class="form-section">
+        <div class="form-section-title">Account Credentials</div>
+        <div class="mb-3">
+          <label class="form-label">Username <span style="color:#ef4444;">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-person"></i>
+            <input type="text" name="username" class="form-control" placeholder="Choose a username" value="{{ form.username.value|default:'' }}" required>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email Address <span style="color:#ef4444;">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="bi bi-envelope"></i>
+            <input type="email" name="email" class="form-control" placeholder="your@email.com" value="{{ form.email.value|default:'' }}" required>
+          </div>
+        </div>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label">Password <span style="color:#ef4444;">*</span></label>
+            <div class="input-icon-wrap">
+              <i class="bi bi-lock"></i>
+              <input type="password" name="password1" class="form-control" placeholder="Min 8 characters" required>
+            </div>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Confirm Password <span style="color:#ef4444;">*</span></label>
+            <div class="input-icon-wrap">
+              <i class="bi bi-lock-fill"></i>
+              <input type="password" name="password2" class="form-control" placeholder="Repeat password" required>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-register">
+        <i class="bi bi-person-plus me-2"></i>Create Account
+      </button>
+    </form>
+  </div>
+
+  <div class="reg-footer">
+    Already have an account? <a href="{% url 'login' %}">Sign in here</a>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  const CONFIG = {
+    store: {
+      headerBg:    'linear-gradient(135deg, #0f172a, #1e3a8a)',
+      btnBg:       'linear-gradient(135deg, #1d4ed8, #2563eb)',
+      btnHoverBg:  'linear-gradient(135deg, #1e40af, #1d4ed8)',
+      btnShadow:   'rgba(37,99,235,.35)',
+      subtitle:    'Medical Store / Pharmacy Registration',
+      namePH:      'e.g. Apollo Pharmacy',
+      licensePH:   'e.g. MH-MUM-123456',
+      cityPH:      'e.g. Mumbai',
+      userPH:      'Choose a store username',
+      btnText:     '🏪 Create Store Account',
+      sectionTitle:'Store Information',
+    },
+    factory: {
+      headerBg:    'linear-gradient(135deg, #064e3b, #059669)',
+      btnBg:       'linear-gradient(135deg, #047857, #059669)',
+      btnHoverBg:  'linear-gradient(135deg, #065f46, #047857)',
+      btnShadow:   'rgba(5,150,105,.35)',
+      subtitle:    'Medicine Factory / Manufacturer Registration',
+      namePH:      'e.g. Alpha Pharma Pvt. Ltd.',
+      licensePH:   'e.g. GJ-AHM-MFG-0001',
+      cityPH:      'e.g. Ahmedabad',
+      userPH:      'Choose a factory username',
+      btnText:     '🏭 Create Factory Account',
+      sectionTitle:'Factory Information',
+    }
+  };
+
+  function applyType(type) {
+    const c = CONFIG[type];
+    // Header
+    document.querySelector('.reg-header').style.background = c.headerBg;
+    document.querySelector('.reg-subtitle').textContent = c.subtitle;
+    // Section title
+    document.querySelector('.biz-section-title').textContent = c.sectionTitle;
+    // Placeholders
+    document.querySelector('[name=business_name]').placeholder = c.namePH;
+    document.querySelector('[name=license_no]').placeholder    = c.licensePH;
+    document.querySelector('[name=city]').placeholder          = c.cityPH;
+    document.querySelector('[name=username]').placeholder      = c.userPH;
+    // Button
+    const btn = document.querySelector('.btn-register');
+    btn.style.background = c.btnBg;
+    btn.innerHTML = `<i class="bi bi-person-plus me-2"></i>${c.btnText}`;
+    btn.onmouseover = () => { btn.style.background = c.btnHoverBg; btn.style.boxShadow = `0 6px 20px ${c.btnShadow}`; };
+    btn.onmouseout  = () => { btn.style.background = c.btnBg; btn.style.boxShadow = 'none'; };
+    // Card highlight colour
+    const isFactory = type === 'factory';
+    document.getElementById('card-store').style.borderColor    = isFactory ? '#e5e7eb' : '#2563eb';
+    document.getElementById('card-store').style.background     = isFactory ? '' : '#eff6ff';
+    document.getElementById('card-factory').style.borderColor  = isFactory ? '#059669' : '#e5e7eb';
+    document.getElementById('card-factory').style.background   = isFactory ? '#f0fdf4' : '';
+    document.getElementById('card-factory').querySelector('.type-label').style.color = isFactory ? '#059669' : '';
+  }
+
+  document.querySelectorAll('.type-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll('.type-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      const radio = card.querySelector('input[type=radio]');
+      radio.checked = true;
+      applyType(radio.value);
+    });
+  });
+
+  // Apply on load based on current selection
+  const checked = document.querySelector('input[name=account_type]:checked');
+  if (checked) applyType(checked.value);
+
+  // Pre-select from URL ?type=store or ?type=factory (from home page buttons)
+  const urlType = new URLSearchParams(window.location.search).get('type');
+  if (urlType === 'factory') {
+    document.getElementById('card-factory').click();
+  } else {
+    applyType('store'); // default
+  }
+</script>
+</body>
+</html>

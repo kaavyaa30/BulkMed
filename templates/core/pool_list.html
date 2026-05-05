@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Order Pools — BulkMed{% endblock %}
+{% block content %}
+
+<div class="page-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+  <div>
+    <h2><i class="bi bi-collection text-primary me-2"></i>Order Pools</h2>
+    <p class="mb-0">
+      {% if request.user.is_staff %}
+        All pools — staff view
+      {% else %}
+        Open pools available to join in <strong>{{ store.city }}</strong> and all cities
+      {% endif %}
+    </p>
+  </div>
+  {% if request.user.is_staff %}
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="?status=open"      class="btn btn-sm {% if request.GET.status == 'open' or not request.GET.status %}btn-primary{% else %}btn-outline-secondary{% endif %}">Open</a>
+    <a href="?status=locked"    class="btn btn-sm {% if request.GET.status == 'locked' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Locked</a>
+    <a href="?status=fulfilled" class="btn btn-sm {% if request.GET.status == 'fulfilled' %}btn-primary{% else %}btn-outline-secondary{% endif %}">Fulfilled</a>
+    <a href="?status="          class="btn btn-sm {% if request.GET.status == '' and request.GET.status is not None %}btn-primary{% else %}btn-outline-secondary{% endif %}">All</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if pools %}
+<div class="row g-4">
+  {% for pool in pools %}
+
+  {# Staff filter by status tab — wrap card in if-block (Django has no {% continue %}) #}
+  {% if not request.user.is_staff or not request.GET.status or pool.status == request.GET.status %}
+
+  <div class="col-md-4">
+    <div class="pool-card h-100 d-flex flex-column {% if pool.status != 'open' %}opacity-75{% endif %}">
+
+      {# Status / privacy badge row #}
+      <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+          <div class="medicine-name">{{ pool.product.name }}</div>
+          <div class="factory-name">{{ pool.product.factory_name }}</div>
+        </div>
+        <div class="d-flex flex-column align-items-end gap-1">
+          {% if pool.status == 'open' %}
+            <span class="discount-badge">{{ pool.current_discount }}%</span>
+          {% elif pool.status == 'locked' %}
+            <span style="font-size:.7rem;font-weight:700;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:99px;border:1px solid #fde68a;">🔒 Locked</span>
+          {% elif pool.status == 'fulfilled' %}
+            <span style="font-size:.7rem;font-weight:700;background:#eff6ff;color:#1d4ed8;padding:3px 10px;border-radius:99px;border:1px solid #bfdbfe;">✅ Fulfilled</span>
+          {% else %}
+            <span style="font-size:.7rem;font-weight:700;background:#f3f4f6;color:#6b7280;padding:3px 10px;border-radius:99px;">{{ pool.get_status_display }}</span>
+          {% endif %}
+          {% if request.user.is_staff and pool.status != 'open' %}
+            <span style="font-size:.65rem;background:#fdf4ff;color:#7e22ce;padding:2px 8px;border-radius:99px;border:1px solid #e9d5ff;">🔐 Private</span>
+          {% endif %}
+          {% if pool.is_stale %}
+            <span style="font-size:.65rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;border:1px solid #fecaca;">⚠ Stale — needs lock</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mb-3">
+        <span class="badge" style="background:var(--primary-light);color:var(--primary);">
+          <i class="bi bi-geo-alt me-1"></i>{{ pool.city }}
+        </span>
+        <span class="badge" style="background:var(--gray-100);color:var(--gray-600);">
+          <i class="bi bi-people me-1"></i>{{ pool.current_member_count }} joined
+        </span>
+        <span class="badge" style="background:var(--gray-100);color:var(--gray-600);">
+          {{ pool.product.get_category_display }}
+        </span>
+        {% if pool.pool_mode == 'urgent' %}
+        <span class="badge" style="background:#fef2f2;color:#dc2626;">⚡ Fast Track</span>
+        {% else %}
+        <span class="badge" style="background:#ede9fe;color:#7c3aed;">⏳ Pool Mode</span>
+        {% endif %}
+      </div>
+
+      {% if pool.status == 'open' %}
+      <!-- Progress to next tier -->
+      {% with pool.next_tier_info as tier %}
+      {% if tier.0 > 0 %}
+      <div class="mb-3">
+        <div class="d-flex justify-content-between mb-1" style="font-size:.75rem;color:var(--gray-500);">
+          <span>{{ pool.current_member_count }} stores</span>
+          <span>{{ tier.0 }} more → {{ tier.1 }}% off</span>
+        </div>
+        <div class="progress" style="height:5px;">
+          <div class="progress-bar bg-success" style="width:{% widthratio pool.current_member_count 10 100 %}%"></div>
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
+      <div class="d-flex justify-content-between align-items-center mb-3 mt-auto">
+        <span class="countdown-pill">
+          <i class="bi bi-clock"></i>
+          <span data-expires="{{ pool.expires_at|date:'c' }}">Loading...</span>
+        </span>
+        <span style="font-size:.8rem;color:var(--gray-500);">₹{{ pool.product.base_price }}/{{ pool.product.unit }}</span>
+      </div>
+
+      <a href="{% url 'pool_detail' pool.id %}" class="btn btn-primary w-100">View & Join →</a>
+
+      {% else %}
+      {# Locked / fulfilled — staff-only detail link #}
+      <div class="mt-auto">
+        <div style="font-size:.78rem;color:#6b7280;margin-bottom:10px;">
+          <i class="bi bi-lock-fill me-1" style="color:#d97706;"></i>
+          Locked {{ pool.dispatched_at|date:"d M Y, H:i"|default:"—" }}
+          &nbsp;·&nbsp; {{ pool.current_member_count }} store{{ pool.current_member_count|pluralize }}
+          &nbsp;·&nbsp; {{ pool.total_qty }} units
+        </div>
+        {% if request.user.is_staff %}
+        <a href="{% url 'pool_detail' pool.id %}" class="btn btn-outline-secondary w-100 btn-sm">
+          <i class="bi bi-eye me-1"></i>View Details (Staff)
+        </a>
+        {% endif %}
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+
+  {% endif %}{# end status tab filter #}
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <p>No open pools right now.<br>Check back soon or ask your admin to create one.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.querySelectorAll('[data-expires]').forEach(el => {
+    const expires = new Date(el.dataset.expires);
+    function update() {
+      const diff = expires - new Date();
+      if (diff <= 0) { el.textContent = 'Expired'; return; }
+      const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
+      el.textContent = `${h}h ${m}m`;
+    }
+    update(); setInterval(update, 60000);
+  });
+</script>
+{% endblock %}

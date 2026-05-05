@@ -1,0 +1,483 @@
+﻿{% extends 'base.html' %}
+{% block title %}Factory Dashboard — {{ factory.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Page shell ── */
+  .fac-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 56px; }
+
+  /* ── Hero ── */
+  .fac-hero {
+    background: linear-gradient(135deg, #064e3b 0%, #059669 60%, #0891b2 100%);
+    border-radius:20px; padding:30px 36px; margin-bottom:24px;
+    box-shadow:0 8px 32px rgba(5,150,105,.22); color:#fff;
+  }
+  .fac-hero h1 { font-size:1.75rem; font-weight:800; letter-spacing:-.5px; margin:0; }
+  .fac-hero .hero-meta { color:rgba(255,255,255,.72); font-size:.875rem; margin:6px 0 0; }
+  .fac-hero .hero-pills { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+  .fac-hero .hero-pill {
+    display:inline-flex; align-items:center; gap:6px;
+    background:rgba(255,255,255,.13); border:1.5px solid rgba(255,255,255,.22);
+    border-radius:99px; padding:5px 14px; font-size:.78rem; font-weight:600; color:#fff;
+  }
+  .verified-pill {
+    display:inline-flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3);
+    border-radius:99px; padding:3px 12px; font-size:.75rem; font-weight:600; color:#fff;
+    margin-left:10px; vertical-align:middle;
+  }
+
+  /* ── Wallet card inside hero ── */
+  .fac-wallet {
+    background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+    border-radius:16px; padding:20px 24px; min-width:220px;
+    box-shadow:0 4px 16px rgba(0,0,0,.15);
+  }
+  .fac-wallet .wlabel { font-size:.65rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:rgba(255,255,255,.6); margin-bottom:6px; }
+  .fac-wallet .wamt   { font-size:2rem; font-weight:800; letter-spacing:-1px; color:#fff; }
+  .fac-wallet .wsub   { font-size:.72rem; color:rgba(255,255,255,.6); margin-top:3px; }
+
+  /* ── KPI cards ── */
+  .kpi-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:12px;
+    padding:16px 18px 14px; box-shadow:0 1px 4px rgba(0,0,0,.06);
+    height:100%;
+  }
+  .kpi-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px; }
+  .kpi-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:1rem; flex-shrink:0; }
+  .kpi-num  { font-size:1.7rem; font-weight:800; letter-spacing:-1px; line-height:1; color:#111827; }
+  .kpi-lbl  { font-size:.75rem; color:#6b7280; font-weight:500; margin-top:4px; }
+
+  /* ── Section cards ── */
+  .s-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,.06); overflow:hidden; margin-bottom:20px; }
+  .s-head  { padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .s-title { font-weight:700; font-size:.95rem; color:#fff; display:flex; align-items:center; gap:10px; }
+  .s-icon  { width:36px; height:36px; border-radius:10px; background:rgba(255,255,255,.15); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+
+  /* ── Table shared ── */
+  .f-table th { padding:10px 16px; font-size:.68rem; text-transform:uppercase; letter-spacing:.5px; font-weight:700; border-bottom:2px solid; white-space:nowrap; }
+  .f-table td { padding:13px 16px; border-bottom:1px solid #f3f4f6; vertical-align:middle; font-size:.84rem; }
+  .f-table tbody tr:last-child td { border-bottom:none; }
+
+  /* ── Status pills ── */
+  .pill { display:inline-flex; align-items:center; gap:4px; font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:99px; white-space:nowrap; }
+  .pill-received   { background:#eff6ff; color:#2563eb; }
+  .pill-processing { background:#fffbeb; color:#d97706; }
+  .pill-dispatched { background:#dbeafe; color:#1d4ed8; }
+  .pill-completed  { background:#dcfce7; color:#16a34a; }
+  .pill-pending    { background:#fef3c7; color:#92400e; }
+  .pill-paid       { background:#dcfce7; color:#166534; }
+  .pill-verified   { background:#dcfce7; color:#166534; border:1px solid #bbf7d0; }
+  .pill-unverified { background:#fef2f2; color:#dc2626; border:1px solid #fecaca; }
+
+  /* ── Revenue summary row ── */
+  .rev-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:20px 22px; box-shadow:0 1px 4px rgba(0,0,0,.06); height:100%; }
+  .rev-num  { font-size:1.4rem; font-weight:800; letter-spacing:-.5px; color:#111827; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .rev-lbl  { font-size:.75rem; color:#6b7280; font-weight:500; margin-top:4px; }
+
+  /* ── Quick actions ── */
+  .qa-block { display:flex; flex-direction:column; align-items:flex-start; gap:10px; padding:22px 20px; text-decoration:none; color:inherit; transition:background .15s; height:100%; }
+  .qa-block:hover { background:#f0fdf4; }
+  .qa-icon  { width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+  .qa-title { font-weight:700; font-size:.875rem; color:#111827; margin-top:2px; }
+  .qa-sub   { font-size:.75rem; color:#6b7280; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+
+<!-- ── Navbar ── -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">🏭</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link active" href="{% url 'factory_dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_order_list' %}"><i class="bi bi-box-seam me-1"></i>Orders</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_deliveries' %}"><i class="bi bi-truck me-1"></i>Deliveries</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_disputes' %}"><i class="bi bi-flag me-1"></i>Disputes</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_products' %}"><i class="bi bi-capsule me-1"></i>Products</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_wallet' %}"><i class="bi bi-wallet2 me-1"></i>Wallet</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'factory_analytics' %}"><i class="bi bi-bar-chart me-1"></i>Analytics</a></li>
+        {% if user.is_staff %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control</a></li>
+        {% endif %}
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">{% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="fac-page">
+<div class="container-fluid px-4" style="max-width:1400px;margin:0 auto;">
+
+{% for message in messages %}
+<div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">
+  {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+
+<!-- ── HERO ── -->
+<div class="fac-hero">
+  <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+    <div>
+      <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:8px;">FACTORY DASHBOARD</div>
+      <h1>
+        {{ factory.name }}
+        {% if factory.is_verified %}
+        <span class="verified-pill"><i class="bi bi-patch-check-fill" style="color:#34d399;"></i> Verified</span>
+        {% else %}
+        <span class="verified-pill" style="background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);"><i class="bi bi-exclamation-circle"></i> Pending Verification</span>
+        {% endif %}
+      </h1>
+      <p class="hero-meta"><i class="bi bi-geo-alt me-1"></i>{{ factory.city }}{% if factory.license_no %} &nbsp;·&nbsp; <i class="bi bi-file-earmark-text me-1"></i>{{ factory.license_no }}{% endif %}</p>
+      <div class="hero-pills">
+        <span class="hero-pill"><i class="bi bi-box-seam" style="color:#6ee7b7;"></i> {{ incoming_count }} Incoming Order{{ incoming_count|pluralize }}</span>
+        <span class="hero-pill"><i class="bi bi-truck" style="color:#93c5fd;"></i> {{ dispatch_count }} Active Dispatch{{ dispatch_count|pluralize }}</span>
+        <span class="hero-pill"><i class="bi bi-clock" style="color:#fcd34d;"></i> {{ pending_payout_count }} Pending Payout{{ pending_payout_count|pluralize }}</span>
+      </div>
+    </div>
+    <div class="fac-wallet">
+      <div class="wlabel">Wallet Balance</div>
+      <div class="wamt">₹{{ factory.wallet_balance|floatformat:2 }}</div>
+      <div class="wsub"><i class="bi bi-arrow-up-short" style="color:#6ee7b7;"></i> Earnings wallet</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN ROW: Incoming Orders + Active Dispatches ── -->
+<div class="row g-4 mb-4">
+
+  <!-- Incoming Orders -->
+  <div class="col-xl-6">
+    <div class="s-card">
+      <div class="s-head" style="background:linear-gradient(135deg,#1e3a8a,#2563eb);">
+        <div class="s-title">
+          <div class="s-icon"><i class="bi bi-box-seam" style="color:#fff;"></i></div>
+          Incoming Orders
+        </div>
+      </div>
+      {% if incoming_orders %}
+      <div class="table-responsive">
+        <table class="table mb-0 f-table" id="tbl-incoming" data-paginate="5">
+          <thead style="background:#eff6ff;">
+            <tr>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">Medicine</th>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">City</th>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">Qty</th>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">Value</th>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">Received</th>
+              <th style="color:#2563eb;border-bottom-color:#bfdbfe;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in incoming_orders %}
+            <tr>
+              <td style="font-weight:600;color:#111827;">{{ order.pool.product.name }}</td>
+              <td style="color:#6b7280;">{{ order.pool.city }}</td>
+              <td>{{ order.total_qty }} {{ order.pool.product.unit }}s</td>
+              <td style="font-weight:700;color:#059669;">₹{{ order.total_value }}</td>
+              <td style="font-size:.78rem;color:#6b7280;">{{ order.received_at|date:"d M, H:i" }}</td>
+              <td>
+                <a href="{% url 'factory_order_detail' order.id %}" class="btn btn-sm btn-primary" style="font-size:.72rem;padding:4px 12px;">View</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px 24px;color:#9ca3af;">
+        <div style="font-size:2.5rem;margin-bottom:10px;">📭</div>
+        <p style="font-size:.875rem;">No incoming orders yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Active Dispatches -->
+  <div class="col-xl-6">
+    <div class="s-card">
+      <div class="s-head" style="background:linear-gradient(135deg,#0c4a6e,#0891b2);">
+        <div class="s-title">
+          <div class="s-icon"><i class="bi bi-truck" style="color:#fff;"></i></div>
+          Active Dispatches
+        </div>
+      </div>
+      {% if active_dispatches %}
+      <div class="table-responsive">
+        <table class="table mb-0 f-table" id="tbl-dispatches" data-paginate="5">
+          <thead style="background:#ecfeff;">
+            <tr>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">Medicine</th>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">Store</th>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">Qty</th>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">ETA</th>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">OTP</th>
+              <th style="color:#0891b2;border-bottom-color:#a5f3fc;">Track</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in active_dispatches %}
+            <tr>
+              <td style="font-weight:600;color:#111827;">{{ d.pool.product.name }}</td>
+              <td style="color:#6b7280;">{{ d.store.name }}</td>
+              <td>{{ d.quantity }}</td>
+              <td style="font-size:.78rem;color:#6b7280;">
+                {% if d.estimated_arrival %}{{ d.estimated_arrival|date:"d M, H:i" }}{% else %}—{% endif %}
+              </td>
+              <td><code style="font-size:.8rem;color:#059669;font-weight:700;">{{ d.delivery_otp }}</code></td>
+              <td>
+                <a href="{% url 'track_delivery' d.id %}" class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:4px 10px;">🗺️ Track</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px 24px;color:#9ca3af;">
+        <div style="font-size:2.5rem;margin-bottom:10px;">🚚</div>
+        <p style="font-size:.875rem;">No active dispatches.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ── DISPUTES ALERT WIDGET ── -->
+{% if open_disputes_count %}
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="s-card" style="border-color:#fecaca;">
+      <div class="s-head" style="background:linear-gradient(135deg,#7f1d1d,#dc2626);">
+        <div class="s-title">
+          <div class="s-icon"><i class="bi bi-flag" style="color:#fff;"></i></div>
+          ⚠️ {{ open_disputes_count }} Open Dispute{{ open_disputes_count|pluralize }} — Payouts Locked
+        </div>
+        <a href="{% url 'factory_disputes' %}" class="btn btn-sm" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:.75rem;">
+          View All Disputes →
+        </a>
+      </div>
+      <div style="padding:16px 20px;font-size:.875rem;color:#374151;">
+        <i class="bi bi-info-circle me-2 text-danger"></i>
+        <strong>{{ open_disputes_count }} payout{{ open_disputes_count|pluralize }} currently on hold.</strong>
+        Stores have raised disputes against deliveries. The 85% factory payout for these orders is
+        <strong>locked</strong> until the admin reviews and resolves each dispute.
+        <a href="{% url 'factory_disputes' %}" style="color:#dc2626;font-weight:600;margin-left:6px;">
+          Check your disputes page →
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── PENDING PAYOUTS — ESCROW BREAKDOWN ── -->
+<div class="row g-4 mb-4">
+  <div class="col-12">
+    <div class="s-card">
+
+      <!-- Section header -->
+      <div class="s-head" style="border-bottom:1px solid var(--gray-200);">
+        <div class="s-title">
+          <div class="s-icon" style="background:var(--warning-light);color:var(--warning);"><i class="bi bi-hourglass-split"></i></div>
+          Pending Payouts — Escrow Breakdown
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span style="font-size:.75rem;color:var(--gray-400);">
+            {{ pending_payout_count }} payout{{ pending_payout_count|pluralize }} awaiting release
+          </span>
+          <a href="{% url 'factory_wallet' %}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">
+            Full History →
+          </a>
+        </div>
+      </div>
+
+      {% if pending_payouts %}
+
+      <!-- ── Aggregated breakdown summary bar ── -->
+      <div style="padding:20px 22px;background:var(--gray-50);border-bottom:1px solid var(--gray-200);">
+        <div style="font-size:.65rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--gray-400);margin-bottom:14px;">
+          <i class="bi bi-calculator me-1"></i>Total Pending — Escrow Split Summary
+        </div>
+        <div class="row g-3">
+
+          <!-- Gross Pool Amount -->
+          <div class="col-12 col-md-4">
+            <div class="stat-card h-100">
+              <div class="stat-icon" style="background:var(--gray-100);">💰</div>
+              <div class="stat-value" style="font-size:1.4rem;">₹{{ pending_gross_total|floatformat:2 }}</div>
+              <div class="stat-label">Gross Pool Amount</div>
+              <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">Total order value before any deductions</div>
+            </div>
+          </div>
+
+          <!-- Platform Commission -->
+          <div class="col-12 col-md-4">
+            <div class="stat-card h-100" style="border-color:var(--danger-light);">
+              <div class="stat-icon" style="background:var(--danger-light);">🏛️</div>
+              <div class="stat-value text-danger" style="font-size:1.4rem;">−₹{{ pending_commission_total|floatformat:2 }}</div>
+              <div class="stat-label">Platform Commission (15%)</div>
+              <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">BulkMed service fee deducted from gross</div>
+            </div>
+          </div>
+
+          <!-- Net Payout to Factory -->
+          <div class="col-12 col-md-4">
+            <div class="stat-card h-100" style="border-color:#bbf7d0;">
+              <div class="stat-icon" style="background:var(--success-light);">✅</div>
+              <div class="stat-value text-success" style="font-size:1.4rem;">₹{{ pending_net_total|floatformat:2 }}</div>
+              <div class="stat-label">Net Payout to You (85%)</div>
+              <div style="font-size:.72rem;color:var(--gray-400);margin-top:2px;">Released to your wallet on admin approval</div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Visual split bar -->
+        <div style="margin-top:16px;">
+          <div class="d-flex justify-content-between mb-1" style="font-size:.72rem;font-weight:600;color:var(--gray-600);">
+            <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:5px;"></span>Your Share (85%)</span>
+            <span>Platform (15%)<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--danger);margin-left:5px;"></span></span>
+          </div>
+          <div style="height:8px;border-radius:99px;background:var(--gray-200);overflow:hidden;display:flex;">
+            <div style="width:85%;background:var(--success);border-radius:99px 0 0 99px;"></div>
+            <div style="width:15%;background:var(--danger);border-radius:0 99px 99px 0;"></div>
+          </div>
+          <div class="d-flex justify-content-between mt-1" style="font-size:.68rem;color:var(--gray-400);">
+            <span>85% → ₹{{ pending_net_total|floatformat:2 }}</span>
+            <span>15% → ₹{{ pending_commission_total|floatformat:2 }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Per-payout breakdown table ── -->
+      <div class="table-responsive">
+        <table class="table mb-0 f-table" id="tbl-pending-payouts" data-paginate="5">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Medicine</th>
+              <th>Store</th>
+              <th>Gross Amount</th>
+              <th>Commission (15%)</th>
+              <th>Net to You (85%)</th>
+              <th>Split</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payout in pending_payouts %}
+            <tr>
+              <td style="font-size:.78rem;color:#6b7280;white-space:nowrap;">{{ payout.created_at|date:"d M Y, H:i" }}</td>
+              <td style="font-weight:600;color:#111827;">{{ payout.pool.product.name }}</td>
+              <td style="color:#6b7280;font-size:.82rem;">
+                {% if payout.delivery %}{{ payout.delivery.store.name }}{% else %}—{% endif %}
+              </td>
+
+              <!-- Gross -->
+              <td>
+                <div style="font-weight:700;color:#111827;">₹{{ payout.gross_amount|floatformat:2 }}</div>
+                <div style="font-size:.68rem;color:#9ca3af;">100% of order</div>
+              </td>
+
+              <!-- Commission deducted -->
+              <td>
+                <div style="font-weight:700;color:#dc2626;">−₹{{ payout.commission_deducted|floatformat:2 }}</div>
+                <div style="font-size:.68rem;color:#9ca3af;">{{ payout.commission_pct }}% of gross</div>
+              </td>
+
+              <!-- Net payout -->
+              <td>
+                <div style="font-weight:800;color:#16a34a;font-size:.95rem;">₹{{ payout.net_payout|floatformat:2 }}</div>
+                <div style="font-size:.68rem;color:#9ca3af;">{{ payout.net_pct }}% of gross</div>
+              </td>
+
+              <!-- Mini split bar -->
+              <td style="min-width:80px;">
+                <div style="height:6px;border-radius:99px;background:var(--gray-200);overflow:hidden;display:flex;margin-bottom:3px;">
+                  <div style="width:85%;background:var(--success);border-radius:99px 0 0 99px;"></div>
+                  <div style="width:15%;background:var(--danger);border-radius:0 99px 99px 0;"></div>
+                </div>
+                <div style="font-size:.62rem;color:var(--gray-400);text-align:center;">85 / 15</div>
+              </td>
+
+              <td>
+                <span class="pill pill-pending">⏳ Pending</span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% else %}
+      <div style="text-align:center;padding:48px 24px;color:#9ca3af;">
+        <div style="font-size:3rem;margin-bottom:12px;">💸</div>
+        <p style="font-size:.9rem;font-weight:500;">No pending payouts.</p>
+        <p style="font-size:.8rem;">Payouts appear here after stores confirm delivery via OTP and are released by the admin.</p>
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+
+<!-- ── BOTTOM ROW: Active Products ── -->
+<div class="row g-4 mb-4">
+  <!-- Active Products only -->
+  <div class="col-12">
+    <div class="s-card">
+      <div class="s-head" style="background:linear-gradient(135deg,#064e3b,#059669);">
+        <div class="s-title">
+          <div class="s-icon"><i class="bi bi-capsule" style="color:#fff;"></i></div>
+          Active Products in Pools
+        </div>
+      </div>
+      {% if active_products %}
+      <div class="table-responsive">
+        <table class="table mb-0 f-table" id="tbl-products" data-paginate="5">
+          <thead style="background:#f0fdf4;">
+            <tr>
+              <th style="color:#059669;border-bottom-color:#bbf7d0;">Medicine</th>
+              <th style="color:#059669;border-bottom-color:#bbf7d0;">Category</th>
+              <th style="color:#059669;border-bottom-color:#bbf7d0;">Open Pools</th>
+              <th style="color:#059669;border-bottom-color:#bbf7d0;">Total Stores</th>
+              <th style="color:#059669;border-bottom-color:#bbf7d0;">Base Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for product in active_products %}
+            <tr>
+              <td style="font-weight:600;color:#111827;">{{ product.name }}</td>
+              <td><span class="pill" style="background:#f3f4f6;color:#374151;">{{ product.get_category_display }}</span></td>
+              <td style="font-weight:700;color:#2563eb;">{{ product.open_pool_count }}</td>
+              <td style="color:#6b7280;">{{ product.total_members }} store{{ product.total_members|pluralize }}</td>
+              <td style="font-weight:600;">₹{{ product.base_price }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:40px 24px;color:#9ca3af;">
+        <div style="font-size:2.5rem;margin-bottom:10px;">💊</div>
+        <p style="font-size:.875rem;">No products in active pools right now.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+</div><!-- /fac-page -->
+{% endblock %}

@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+{% block title %}Cancel Order — BulkMed{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="page-header"><h2>Cancel Order</h2><p>Review the cancellation policy before proceeding.</p></div>
+
+    {% if cancellation_locked %}
+    <div class="card" style="border:2px solid var(--danger);">
+      <div class="card-header" style="background:var(--danger-light);">
+        <i class="bi bi-lock-fill text-danger me-2"></i>Cancellation Locked
+      </div>
+      <div class="card-body text-center py-4">
+        <div style="font-size:2.5rem;">🔒</div>
+        <p class="fw-bold mt-3 mb-1" style="color:#dc2626;">Cancellations are locked for this pool</p>
+        <p class="text-muted" style="font-size:.875rem;">
+          This pool has passed 80% of its lifespan. Cancellations are no longer allowed to protect other participating stores.
+        </p>
+        <p style="font-size:.8rem;color:#6b7280;">Cancellation window closed at: <strong>{{ cancellation_lockout_time|date:"h:i A, d M Y" }}</strong></p>
+        <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-2">Back to Dashboard</a>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="card" style="border:2px solid {% if pool_is_locked %}var(--danger){% else %}var(--warning){% endif %};">
+      <div class="card-header" style="background:{% if pool_is_locked %}var(--danger-light){% else %}var(--warning-light){% endif %};">
+        <i class="bi bi-{% if pool_is_locked %}lock-fill text-danger{% else %}unlock text-warning{% endif %} me-2"></i>
+        {% if pool_is_locked %}Pool Locked — Penalty Applies{% else %}Free Cancellation Available{% endif %}
+      </div>
+      <div class="card-body">
+        <table class="summary-table w-100 mb-4">
+          <tr><td>Medicine</td><td><strong>{{ entry.pool.product.name }}</strong></td></tr>
+          <tr><td>Quantity</td><td>{{ entry.quantity }} {{ entry.pool.product.unit }}s</td></tr>
+          <tr><td>Total</td><td><strong>₹{{ entry.total_amount }}</strong></td></tr>
+          <tr><td>Pool Status</td><td>{{ entry.pool.get_status_display }}</td></tr>
+          {% if entry.escrow_amount > 0 %}
+          <tr><td>Advance Deposit</td><td style="color:#16a34a;font-weight:700;">₹{{ entry.escrow_amount }} (will be refunded)</td></tr>
+          {% endif %}
+        </table>
+
+        {% if pool_is_locked %}
+        <div class="alert alert-danger">
+          <strong><i class="bi bi-lock-fill me-1"></i>Pool is Locked</strong><br>
+          A penalty of <strong>₹{{ penalty }}</strong> will be deducted from your wallet balance.
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+          <strong><i class="bi bi-check-circle me-1"></i>No Charges</strong><br>
+          The pool is still open. You can cancel for free.
+          {% if entry.escrow_amount > 0 %}Your <strong>₹{{ entry.escrow_amount }}</strong> advance deposit will be refunded immediately.{% endif %}
+        </div>
+        <div style="font-size:.78rem;color:#6b7280;margin-bottom:12px;">
+          <i class="bi bi-clock me-1"></i>Cancellation window closes at: <strong>{{ cancellation_lockout_time|date:"h:i A, d M Y" }}</strong>
+        </div>
+        {% endif %}
+
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <button type="submit" class="btn {% if pool_is_locked %}btn-danger{% else %}btn-warning{% endif %} flex-fill">
+            {% if pool_is_locked %}<i class="bi bi-x-circle me-1"></i>Cancel & Pay ₹{{ penalty }}{% else %}<i class="bi bi-x-circle me-1"></i>Cancel (Free){% endif %}
+          </button>
+          <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary flex-fill">Go Back</a>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

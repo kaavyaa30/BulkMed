@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Low Stock Items — {{ store.name }}{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+        {% if user.is_staff %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        {% endif %}
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<style>
+  .ls-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 48px; }
+  .ls-header { background:linear-gradient(135deg,#7f1d1d,#dc2626); border-radius:20px; padding:28px 32px; margin-bottom:24px; box-shadow:0 8px 32px rgba(220,38,38,.2); }
+  .ls-header h1 { font-size:1.6rem; font-weight:800; color:#fff; margin:0; }
+  .ls-header p { color:rgba(255,255,255,.75); font-size:.875rem; margin:6px 0 0; }
+  .back-btn { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.15); border:1.5px solid rgba(255,255,255,.3); border-radius:99px; padding:6px 16px; font-size:.78rem; font-weight:600; color:#fff; text-decoration:none; transition:background .15s; }
+  .back-btn:hover { background:rgba(255,255,255,.25); color:#fff; }
+  .ls-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .ls-card-head { background:linear-gradient(135deg,#7f1d1d,#dc2626); padding:16px 22px; display:flex; justify-content:space-between; align-items:center; }
+  .ls-card-title { font-weight:700; font-size:.9rem; color:#fff; display:flex; align-items:center; gap:10px; }
+  .ls-row { padding:18px 22px; border-bottom:1px solid #fff1f2; }
+  .ls-row:last-child { border-bottom:none; }
+  .ls-bar { height:6px; border-radius:99px; background:#fee2e2; overflow:hidden; margin:10px 0 6px; }
+  .ls-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#f59e0b,#ef4444); }
+  .ls-cart { width:38px; height:38px; border-radius:10px; background:#fff1f2; display:flex; align-items:center; justify-content:center; color:#dc2626; text-decoration:none; flex-shrink:0; border:1px solid #fecaca; transition:all .15s; }
+  .ls-cart:hover { background:#fecaca; }
+  .empty-state { text-align:center; padding:64px 24px; color:#9ca3af; }
+</style>
+
+<div class="ls-page">
+  <div class="container-fluid px-4" style="max-width:900px;margin:0 auto;">
+
+    <div class="ls-header">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <h1><i class="bi bi-exclamation-triangle me-2"></i>Low Stock Items</h1>
+          <p>{{ store.name }} &nbsp;·&nbsp; {{ low_stock|length }} item{{ low_stock|length|pluralize }} need{{ low_stock|length|pluralize:"s," }} restocking</p>
+        </div>
+        <a href="{% url 'dashboard' %}" class="back-btn"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+      </div>
+    </div>
+
+    {% if low_stock %}
+    <div class="ls-card">
+      <div class="ls-card-head">
+        <div class="ls-card-title">
+          <i class="bi bi-box-seam"></i> Inventory Alert
+        </div>
+        <span style="font-size:.72rem;color:rgba(255,255,255,.75);">{{ low_stock|length }} item{{ low_stock|length|pluralize }}</span>
+      </div>
+
+      {% for inv in low_stock %}
+      {% widthratio inv.current_stock inv.threshold 100 as pct %}
+      <div class="ls-row">
+        <div class="d-flex justify-content-between align-items-start">
+          <div class="flex-fill me-3">
+            <div style="font-weight:700;font-size:.95rem;color:#111827;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              {{ inv.product.name }}
+              {% if inv.current_stock == 0 %}
+                <span style="font-size:.65rem;background:#fef2f2;color:#ef4444;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #fecaca;">Out of Stock</span>
+              {% elif inv.current_stock <= 3 %}
+                <span style="font-size:.65rem;background:#fef2f2;color:#ef4444;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #fecaca;">Critical</span>
+              {% else %}
+                <span style="font-size:.65rem;background:#fffbeb;color:#d97706;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #fde68a;">Low</span>
+              {% endif %}
+            </div>
+            <div style="font-size:.78rem;color:#6b7280;margin-top:4px;">
+              <i class="bi bi-tag me-1"></i>{{ inv.product.generic_name|default:inv.product.category }}
+              &nbsp;·&nbsp;
+              <i class="bi bi-box me-1"></i>{{ inv.current_stock }} / {{ inv.threshold }} {{ inv.product.unit }}s
+            </div>
+            <div class="ls-bar">
+              <div class="ls-fill" style="width:{% if pct >= 100 %}95{% else %}{{ pct }}{% endif %}%;"></div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <span style="font-size:.75rem;font-weight:600;color:#f59e0b;">
+                {% if pct >= 100 %}At threshold{% else %}{{ pct }}% remaining{% endif %}
+              </span>
+              <span style="font-size:.72rem;color:#9ca3af;">Threshold: {{ inv.threshold }} units</span>
+            </div>
+          </div>
+          {% if inv.open_pool_id %}
+          <a href="{% url 'pool_detail' inv.open_pool_id %}" class="ls-cart" title="Order {{ inv.product.name }}">
+            <i class="bi bi-cart"></i>
+          </a>
+          {% else %}
+          <a href="{% url 'pool_list' %}" class="ls-cart" title="Browse pools">
+            <i class="bi bi-cart"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+
+      <div style="padding:16px 22px;background:#fff5f5;border-top:1px solid #fff1f2;">
+        <a href="{% url 'pool_list' %}" class="btn btn-danger w-100" style="border-radius:10px;font-weight:700;">
+          <i class="bi bi-collection me-2"></i>Browse All Pools to Restock
+        </a>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="ls-card">
+      <div class="empty-state">
+        <div style="font-size:3.5rem;margin-bottom:16px;">✅</div>
+        <div style="font-size:1.1rem;font-weight:700;color:#111827;margin-bottom:8px;">All stocked up</div>
+        <p style="font-size:.875rem;">No items are currently below their stock threshold.</p>
+        <a href="{% url 'dashboard' %}" class="btn btn-primary mt-2">Back to Dashboard</a>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endblock %}
+

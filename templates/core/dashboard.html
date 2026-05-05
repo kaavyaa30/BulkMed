@@ -1,0 +1,1082 @@
+{% extends 'base.html' %}
+{% block title %}{% if is_admin_view %}Admin Overview — BulkMed{% else %}Dashboard — {{ store.name }}{% endif %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .dash-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 48px; }
+
+  /* Hero */
+  .dash-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%);
+    border:none; border-radius:20px;
+    padding:32px 36px; margin-bottom:24px; box-shadow:0 8px 32px rgba(15,23,42,.25);
+  }
+  .dash-hero h1 { font-size:2rem; font-weight:800; letter-spacing:-.5px; color:#fff; margin:0; }
+  .verified-pill { display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:99px;padding:3px 12px;font-size:.75rem;font-weight:600;color:#fff;margin-left:10px;vertical-align:middle;backdrop-filter:blur(4px); }
+  .hero-meta { color:rgba(255,255,255,.7); font-size:.875rem; margin:8px 0 0; }
+  .hero-pills { display:flex;gap:10px;margin-top:14px;flex-wrap:wrap; }
+  .hero-pill { display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 14px;font-size:.78rem;font-weight:600;color:#fff;backdrop-filter:blur(4px); }
+  .wallet-card { background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:16px;padding:20px 24px;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.15);backdrop-filter:blur(8px); }
+  .wallet-label { font-size:.65rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:6px; }
+  .wallet-amount { font-size:2rem;font-weight:800;letter-spacing:-1px;color:#fff; }
+  .wallet-sub { font-size:.72rem;color:rgba(255,255,255,.6);margin-top:3px; }
+  .wallet-btns { display:flex;gap:8px;margin-top:14px; }
+  .wallet-btns .btn-add { background:#fff;color:#1e3a8a;border:none;border-radius:8px;padding:8px 18px;font-size:.8rem;font-weight:700;cursor:pointer;transition:all .15s; }
+  .wallet-btns .btn-add:hover { background:#f0f9ff;transform:translateY(-1px); }
+  .wallet-btns .btn-hist { background:rgba(255,255,255,.15);color:#fff;border:1.5px solid rgba(255,255,255,.3);border-radius:8px;padding:8px 14px;font-size:.8rem;font-weight:600;cursor:pointer;transition:all .15s; }
+  .wallet-btns .btn-hist:hover { background:rgba(255,255,255,.25); }
+
+  /* KPI cards */
+  .kpi-card { background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:22px 24px 18px;box-shadow:0 1px 4px rgba(0,0,0,.06);transition:box-shadow .2s,transform .2s;display:flex;flex-direction:column;position:relative;overflow:hidden;height:100%; }
+  .kpi-card:hover { box-shadow:0 6px 20px rgba(0,0,0,.09);transform:translateY(-2px); }
+  .kpi-card::before { content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:16px 16px 0 0; }
+  .kpi-top { display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px; }
+  .kpi-trend { font-size:.72rem;font-weight:600;color:#9ca3af; }
+  .kpi-icon { width:46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0; }
+  .kpi-num { font-size:2.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1;color:#111827; }
+  .kpi-lbl { font-size:.8rem;color:#6b7280;font-weight:500;margin-top:5px; }
+  .kpi-divider { height:1px;background:#f3f4f6;margin:16px 0 12px; }
+  .kpi-link { font-size:.75rem;font-weight:600;color:#6b7280;text-decoration:none;display:flex;align-items:center;gap:4px; }
+  .kpi-link:hover { color:#2563eb; }
+
+  /* Section cards */
+  .s-card { background:#fff;border:1px solid #e5e7eb;border-radius:16px;box-shadow:0 1px 4px rgba(0,0,0,.06);overflow:hidden;margin-bottom:20px; }
+  .s-card-head { padding:18px 22px;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center; }
+  .s-card-title { font-weight:700;font-size:.95rem;color:#111827;display:flex;align-items:center;gap:10px; }
+  .s-icon { width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+
+  /* AI card */
+  .ai-card { background:linear-gradient(135deg,#fffbeb,#fef9c3);border:1px solid #fde68a;border-radius:16px;overflow:hidden;margin-bottom:20px;box-shadow:0 1px 4px rgba(0,0,0,.06); }
+  .ai-head { padding:18px 22px;border-bottom:1px solid #fde68a;display:flex;justify-content:space-between;align-items:center; }
+  .ai-pill { background:#fef3c7;border:1.5px solid #fde68a;border-radius:99px;padding:5px 14px;font-size:.72rem;font-weight:600;color:#92400e;display:flex;align-items:center;gap:5px; }
+  .ai-row { display:flex;align-items:center;gap:14px;padding:16px 22px;border-bottom:1px solid #fde68a;background:#fff; }
+  .ai-row:last-child { border-bottom:none; }
+  .ai-num { width:28px;height:28px;border-radius:50%;border:1.5px solid #fde68a;display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;color:#92400e;flex-shrink:0; }
+  .ai-name { font-weight:700;font-size:.9rem;color:#111827;display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
+  .ai-reason { font-size:.78rem;color:#6b7280;margin-top:3px; }
+  .ai-meta { display:flex;flex-direction:column;gap:5px;align-items:flex-end;margin-right:12px;flex-shrink:0; }
+  .pill-date { display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid #e5e7eb;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:600;color:#374151; }
+  .pill-units { display:inline-flex;align-items:center;gap:5px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:99px;padding:3px 10px;font-size:.72rem;font-weight:600;color:#166534; }
+  .hd-badge { font-size:.62rem;background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #e5e7eb;display:inline-flex;align-items:center;gap:3px; }
+
+  /* Active Orders table — indigo accent */
+  .orders-card-head { background:linear-gradient(135deg,#1e1b4b,#312e81);padding:18px 22px;display:flex;justify-content:space-between;align-items:center; }
+  .orders-card-title { font-weight:700;font-size:.95rem;color:#fff;display:flex;align-items:center;gap:10px; }
+  .orders-s-icon { width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0; }
+  .orders-table th { padding:11px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#6366f1;font-weight:700;background:#f5f3ff;border-bottom:2px solid #e0e7ff;white-space:nowrap; }
+  .orders-table td { padding:14px 16px;border-bottom:1px solid #f3f4f6;vertical-align:middle;font-size:.84rem; }
+  .orders-table tbody tr:last-child td { border-bottom:none; }
+  .orders-table tbody tr:hover { background:#faf5ff; }
+  .orders-footer { padding:14px 22px;border-top:1px solid #e0e7ff;background:#f5f3ff;display:flex;justify-content:space-between;align-items:center; }
+  .mode-tag { display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap; }
+  .mode-urgent { background:#fef2f2;color:#dc2626; }
+  .mode-pool { background:#ede9fe;color:#7c3aed; }
+  .status-pill { font-size:.72rem;background:#ede9fe;color:#5b21b6;padding:3px 10px;border-radius:6px;font-weight:600;white-space:nowrap; }
+  .eta-date { font-size:.82rem;font-weight:600;color:#111827; }
+  .eta-hrs { font-size:.72rem;color:#dc2626;font-weight:600;margin-top:2px; }
+
+  /* Low stock — rose/coral accent */
+  .ls-card { border-radius:16px;overflow:hidden;margin-bottom:20px;box-shadow:0 2px 12px rgba(239,68,68,.1);position:relative; }
+  .ls-card-head { background:linear-gradient(135deg,#7f1d1d,#dc2626);padding:18px 22px;display:flex;justify-content:space-between;align-items:center;border-bottom:none; }
+  .ls-card-title { font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:10px; }
+  .ls-card-sub { font-size:.72rem;color:rgba(255,255,255,.7); }
+  .ls-body { background:#fff; }
+  .ls-row { padding:16px 22px;border-bottom:1px solid #fff1f2; }
+  .ls-row:last-child { border-bottom:none; }
+  .ls-bar { height:6px;border-radius:99px;background:#fee2e2;overflow:hidden;margin:10px 0 6px; }
+  .ls-fill { height:100%;border-radius:99px;background:linear-gradient(90deg,#f59e0b,#ef4444); }
+  .ls-cart { width:36px;height:36px;border-radius:10px;background:#fff1f2;display:flex;align-items:center;justify-content:center;color:#dc2626;text-decoration:none;flex-shrink:0;border:1px solid #fecaca;cursor:pointer;transition:all .15s; }
+  .ls-cart:hover { background:#fecaca; }
+  .ls-footer { padding:14px 22px;border-top:1px solid #fff1f2;background:#fff5f5; }
+
+  /* Quick Actions — teal/emerald accent */
+  .qa-card-head { background:linear-gradient(135deg,#064e3b,#059669);padding:18px 22px;display:flex;justify-content:space-between;align-items:center; }
+  .qa-card-title { font-weight:700;font-size:.95rem;color:#fff; }
+  .qa-block { display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:22px 20px;text-decoration:none;color:inherit;transition:background .15s;height:100%; }
+  .qa-block:hover { background:#f0fdf4; }
+  .qa-block-icon { width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0; }
+  .qa-block-title { font-weight:700;font-size:.875rem;color:#111827;margin-top:2px; }
+  .qa-block-sub { font-size:.75rem;color:#6b7280; }
+
+  /* Recent Activity — slate/blue accent */
+  .act-card-head { background:linear-gradient(135deg,#0c4a6e,#0284c7);padding:18px 22px;display:flex;justify-content:space-between;align-items:center; }
+  .act-card-title { font-weight:700;font-size:.95rem;color:#fff; }
+  .act-card-meta { font-size:.72rem;color:rgba(255,255,255,.7);display:flex;align-items:center;gap:4px; }
+  .act-row { display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid #f0f9ff; }
+  .act-row:last-child { border-bottom:none; }
+  .act-icon { width:40px;height:40px;border-radius:10px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;color:#4b5563;position:relative; }
+  .act-title { font-weight:600;font-size:.875rem;color:#111827; }
+  .act-sub { font-size:.75rem;color:#9ca3af;margin-top:1px; }
+  .act-time { font-size:.72rem;color:#6b7280;white-space:nowrap;margin-left:auto;background:#f3f4f6;border-radius:99px;padding:3px 10px;font-weight:500; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static humanize %}
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link active" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}"><i class="bi bi-map me-1"></i>Map</a></li>
+        {% if user.is_staff %}
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        {% endif %}
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="dash-page">
+  <div class="container-fluid px-4" style="max-width:1400px;margin:0 auto;">
+
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-4">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+
+    {% if is_admin_view %}
+    <!-- ══════════════════════════════════════════════════════════════
+         EXECUTIVE COMMAND CENTER — superusers only
+    ══════════════════════════════════════════════════════════════ -->
+
+    {# ── Hero — Premium SaaS style with vibrant gradient ── #}
+    <div class="dash-hero" style="background:linear-gradient(135deg,#1e3a8a 0%,#3b82f6 50%,#0891b2 100%);border:none;">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+        <div>
+          <div style="font-size:.65rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:6px;">SUPERADMIN · EXECUTIVE COMMAND CENTER</div>
+          <h1 style="color:#fff;font-size:1.9rem;font-weight:800;margin:0;letter-spacing:-.5px;">BulkMed Platform</h1>
+          <p class="hero-meta" style="margin-top:10px;color:rgba(255,255,255,.85);">
+            <span class="hero-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;"><i class="bi bi-shop" style="color:#6ee7b7;"></i> {{ total_stores }} Verified Stores</span>
+            <span class="hero-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;"><i class="bi bi-building" style="color:#93c5fd;"></i> {{ total_factories }} Verified Factories</span>
+            <span class="hero-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff;"><i class="bi bi-collection" style="color:#fcd34d;"></i> {{ active_pools }} Open Pools</span>
+          </p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'control_panel' %}" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:10px;padding:10px 18px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">
+            <i class="bi bi-gear"></i> Control Panel
+          </a>
+          <a href="{% url 'financial_audit_trail' %}" style="background:rgba(99,102,241,.25);border:1.5px solid rgba(165,180,252,.5);border-radius:10px;padding:10px 18px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);transition:all .2s;" onmouseover="this.style.background='rgba(99,102,241,.4)'" onmouseout="this.style.background='rgba(99,102,241,.25)'">
+            <i class="bi bi-journal-text"></i> Audit Trail
+          </a>
+          <a href="{% url 'admin_order_history' %}" style="background:rgba(16,185,129,.2);border:1.5px solid rgba(52,211,153,.4);border-radius:10px;padding:10px 18px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);transition:all .2s;" onmouseover="this.style.background='rgba(16,185,129,.35)'" onmouseout="this.style.background='rgba(16,185,129,.2)'">
+            <i class="bi bi-receipt"></i> Order History
+          </a>          <button onclick="refreshStats()" id="refresh-btn"
+                  style="background:rgba(110,231,183,.2);border:1.5px solid rgba(110,231,183,.4);border-radius:10px;padding:10px 16px;color:#fff;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px;backdrop-filter:blur(8px);transition:all .2s;" onmouseover="this.style.background='rgba(110,231,183,.3)'" onmouseout="this.style.background='rgba(110,231,183,.2)'">
+            <i class="bi bi-arrow-clockwise"></i> Refresh
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {# ── Platform Financials Hub ── #}
+    <div class="row g-3 mb-4">
+      <div class="col-12">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(37,99,235,.08);">
+          <div style="background:linear-gradient(135deg,#1e3a8a,#2563eb);padding:14px 22px;display:flex;align-items:center;gap:10px;">
+            <div style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-bank" style="color:#fff;"></i></div>
+            <div style="font-size:.8rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#fff;">Platform Financials</div>
+          </div>
+          <div class="row g-0">
+            <div class="col-12 col-md-4" style="padding:22px 24px;border-right:1px solid #f3f4f6;">
+              <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Total Commission Earned</div>
+              <div style="font-size:1.9rem;font-weight:800;color:#111827;letter-spacing:-1px;line-height:1;">&#8377;<span id="kpi-balance">{{ total_revenue|floatformat:2|intcomma }}</span></div>
+              <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">All-time platform revenue</div>
+            </div>
+            <div class="col-12 col-md-4" style="padding:22px 24px;border-right:1px solid #f3f4f6;">
+              <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Funds in Escrow</div>
+              <div style="font-size:1.9rem;font-weight:800;color:#d97706;letter-spacing:-1px;line-height:1;">&#8377;{{ escrow_balance|floatformat:2|intcomma }}</div>
+              <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">Active pool advance deposits</div>
+            </div>
+            <div class="col-12 col-md-4" style="padding:22px 24px;">
+              <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Available Balance</div>
+              <div style="font-size:1.9rem;font-weight:800;color:#10b981;letter-spacing:-1px;line-height:1;">&#8377;{{ available_balance|floatformat:2|intcomma }}</div>
+              <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">Platform wallet &middot; Total earned: &#8377;{{ platform_wallet.total_earned|floatformat:2|intcomma }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── KPI Row ── #}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-3">
+        <a href="{% url 'control_panel' %}" style="text-decoration:none;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 20px 16px;box-shadow:0 2px 12px rgba(220,38,38,.08);transition:box-shadow .2s,transform .2s;overflow:hidden;position:relative;" onmouseover="this.style.boxShadow='0 8px 24px rgba(220,38,38,.14)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(220,38,38,.08)';this.style.transform='none'">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:{% if open_disputes > 0 %}linear-gradient(90deg,#dc2626,#f87171){% else %}linear-gradient(90deg,#10b981,#34d399){% endif %};border-radius:14px 14px 0 0;"></div>
+            <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Open Disputes</span><i class="bi bi-flag" style="color:#dc2626;font-size:.85rem;"></i>
+            </div>
+            <div style="font-size:2.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1;color:{% if open_disputes > 0 %}#dc2626{% else %}#10b981{% endif %};"><span id="kpi-disputes">{{ open_disputes }}</span></div>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">{% if open_disputes > 0 %}Needs action{% else %}All clear &#10003;{% endif %}</div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="{% url 'control_panel' %}?section=factory" style="text-decoration:none;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 20px 16px;box-shadow:0 2px 12px rgba(245,158,11,.08);transition:box-shadow .2s,transform .2s;overflow:hidden;position:relative;" onmouseover="this.style.boxShadow='0 8px 24px rgba(245,158,11,.14)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(245,158,11,.08)';this.style.transform='none'">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#fcd34d);border-radius:14px 14px 0 0;"></div>
+            <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Pending Payouts</span><i class="bi bi-wallet2" style="color:#f59e0b;font-size:.85rem;"></i>
+            </div>
+            <div style="font-size:2.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1;color:#d97706;"><span id="kpi-payouts">{{ pending_payouts }}</span></div>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">Awaiting release</div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="{% url 'control_panel' %}?section=factory" style="text-decoration:none;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 20px 16px;box-shadow:0 2px 12px rgba(37,99,235,.08);transition:box-shadow .2s,transform .2s;overflow:hidden;position:relative;" onmouseover="this.style.boxShadow='0 8px 24px rgba(37,99,235,.14)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(37,99,235,.08)';this.style.transform='none'">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#2563eb,#60a5fa);border-radius:14px 14px 0 0;"></div>
+            <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Pending Orders</span><i class="bi bi-box-seam" style="color:#3b82f6;font-size:.85rem;"></i>
+            </div>
+            <div style="font-size:2.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1;color:#2563eb;"><span id="kpi-orders">{{ pending_orders }}</span></div>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">Awaiting acceptance</div>
+          </div>
+        </a>
+      </div>
+      <div class="col-6 col-md-3">
+        <a href="{% url 'pool_list' %}" style="text-decoration:none;">
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:20px 20px 16px;box-shadow:0 2px 12px rgba(16,185,129,.08);transition:box-shadow .2s,transform .2s;overflow:hidden;position:relative;" onmouseover="this.style.boxShadow='0 8px 24px rgba(16,185,129,.14)';this.style.transform='translateY(-2px)'" onmouseout="this.style.boxShadow='0 2px 12px rgba(16,185,129,.08)';this.style.transform='none'">
+            <div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#10b981,#34d399);border-radius:14px 14px 0 0;"></div>
+            <div style="font-size:.68rem;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Active Pools</span><i class="bi bi-collection" style="color:#10b981;font-size:.85rem;"></i>
+            </div>
+            <div style="font-size:2.2rem;font-weight:800;letter-spacing:-1.5px;line-height:1;color:#10b981;">{{ active_pools }}</div>
+            <div style="font-size:.72rem;color:#9ca3af;margin-top:6px;">Open group orders</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    {# ── Insights Row: AI Forecast + Audit Feed ── #}
+    <div class="row g-4 mb-4">
+      <div class="col-lg-6">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;height:100%;box-shadow:0 2px 12px rgba(245,158,11,.08);">
+          <div style="background:linear-gradient(135deg,#92400e,#d97706);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-cpu" style="color:#fef3c7;"></i></div>
+              AI Demand Forecast
+            </div>
+            <span style="font-size:.7rem;color:rgba(255,255,255,.75);background:rgba(255,255,255,.15);padding:3px 10px;border-radius:99px;">Next 15 days</span>
+          </div>
+          {% if ai_demand_signals %}
+          {% for signal in ai_demand_signals %}
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid #f3f4f6;">
+            <div style="width:34px;height:34px;border-radius:8px;background:#fffbeb;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
+              {% if signal.multiplier >= 2.0 %}&#128293;{% elif signal.multiplier >= 1.5 %}&#128200;{% else %}&#9888;&#65039;{% endif %}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-weight:600;font-size:.84rem;color:#111827;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ signal.product }}</div>
+              <div style="font-size:.72rem;color:#6b7280;margin-top:2px;">{{ signal.reason }}</div>
+            </div>
+            <span style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:3px 10px;font-size:.72rem;font-weight:700;color:#92400e;white-space:nowrap;">x{{ signal.multiplier }}</span>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div style="text-align:center;padding:40px;color:#6b7280;font-size:.875rem;">
+            <i class="bi bi-check-circle" style="font-size:1.5rem;display:block;margin-bottom:8px;color:#10b981;"></i>
+            No demand spikes predicted
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;height:100%;box-shadow:0 2px 12px rgba(16,185,129,.08);">
+          <div style="background:linear-gradient(135deg,#064e3b,#059669);padding:14px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-activity" style="color:#6ee7b7;"></i></div>
+              Live Audit Feed
+            </div>
+            <span style="font-size:.7rem;color:rgba(255,255,255,.75);background:rgba(255,255,255,.15);padding:3px 10px;border-radius:99px;">Last 5 events</span>
+          </div>
+          {% if audit_feed %}
+          {% for entry in audit_feed %}
+          <div style="display:flex;align-items:center;gap:12px;padding:13px 20px;border-bottom:1px solid #f3f4f6;">
+            <div style="width:34px;height:34px;border-radius:8px;background:{% if entry.transaction_type == 'credit' %}#f0fdf4{% else %}#fef2f2{% endif %};display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;">
+              {% if entry.transaction_type == 'credit' %}&#128176;{% else %}&#128184;{% endif %}
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div style="font-size:.82rem;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ entry.description|truncatechars:45 }}</div>
+              <div style="font-size:.7rem;color:#9ca3af;margin-top:2px;">{{ entry.created_at|date:"d M Y, H:i" }}</div>
+            </div>
+            <span style="font-size:.78rem;font-weight:700;white-space:nowrap;{% if entry.transaction_type == 'credit' %}color:#10b981;{% else %}color:#dc2626;{% endif %}">
+              {% if entry.transaction_type == 'credit' %}+{% else %}-{% endif %}&#8377;{{ entry.amount }}
+            </span>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div style="text-align:center;padding:40px;color:#6b7280;font-size:.875rem;">No recent activity</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {# ── Revenue Chart ── #}
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(37,99,235,.08);">
+          <div style="background:linear-gradient(135deg,#1e1b4b,#4338ca);padding:14px 22px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-graph-up-arrow" style="color:#a5b4fc;"></i></div>
+              Platform Earnings — Last 30 Days
+            </div>
+            <span style="font-size:.7rem;color:rgba(255,255,255,.75);background:rgba(255,255,255,.15);padding:3px 10px;border-radius:99px;">Daily commission</span>
+          </div>
+          <div style="padding:20px 22px;">
+            <canvas id="revenueChart" height="80"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Registration Queue ── #}
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div style="background:#fff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(16,185,129,.08);">
+          <div style="background:linear-gradient(135deg,#065f46,#10b981);padding:14px 22px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:.9rem;color:#fff;display:flex;align-items:center;gap:8px;">
+              <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-person-check" style="color:#d1fae5;"></i></div>
+              Registration Queue
+              {% if pending_registrations %}
+              <span style="background:#dc2626;color:#fff;font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:99px;">
+                {{ pending_registrations }} pending
+              </span>
+              {% endif %}
+            </div>
+            <a href="{% url 'control_panel' %}" style="font-size:.75rem;color:rgba(255,255,255,.85);text-decoration:none;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:99px;transition:all .2s;" onmouseover="this.style.background='rgba(255,255,255,.25)'" onmouseout="this.style.background='rgba(255,255,255,.15)'">View all in Control Panel</a>
+          </div>
+          {% if unverified_stores or unverified_factories %}
+          <div class="table-responsive">
+            <table style="width:100%;border-collapse:collapse;font-size:.82rem;">
+              <thead>
+                <tr>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Type</th>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Name</th>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">City</th>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">License</th>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Registered</th>
+                  <th style="padding:10px 16px;color:#6b7280;font-size:.67rem;text-transform:uppercase;letter-spacing:.5px;font-weight:600;border-bottom:1px solid #e5e7eb;background:#f9fafb;">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in unverified_stores %}{% if not s.is_verified %}
+                <tr style="border-bottom:1px solid #f3f4f6;">
+                  <td style="padding:12px 16px;"><span style="background:#eff6ff;color:#2563eb;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:99px;">Store</span></td>
+                  <td style="padding:12px 16px;color:#111827;font-weight:600;">{{ s.name }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;">{{ s.city|default:"--" }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;font-size:.78rem;">{{ s.license_no }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;font-size:.78rem;">{{ s.created_at|date:"d M Y" }}</td>
+                  <td style="padding:12px 16px;">
+                    <form method="post" action="{% url 'verify_store' s.id %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:4px 12px;color:#16a34a;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+                        <i class="bi bi-check-circle me-1"></i>Verify
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+                {% endif %}{% endfor %}
+                {% for f in unverified_factories %}{% if not f.is_verified %}
+                <tr data-factory="{{ f.id }}" style="border-bottom:1px solid #f3f4f6;">
+                  <td style="padding:12px 16px;"><span style="background:#f0fdf4;color:#16a34a;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:99px;">Factory</span></td>
+                  <td style="padding:12px 16px;color:#111827;font-weight:600;">{{ f.name }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;">{{ f.city|default:"--" }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;font-size:.78rem;">{{ f.license_no|default:"--" }}</td>
+                  <td style="padding:12px 16px;color:#6b7280;font-size:.78rem;">{{ f.created_at|date:"d M Y"|default:"--" }}</td>
+                  <td style="padding:12px 16px;">
+                    <button onclick="verifyFactory({{ f.id }})"
+                            style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:4px 12px;color:#16a34a;font-size:.72rem;font-weight:700;cursor:pointer;transition:all .15s;" onmouseover="this.style.background='#dcfce7'" onmouseout="this.style.background='#f0fdf4'">
+                      <i class="bi bi-check-circle me-1"></i>Verify
+                    </button>
+                  </td>
+                </tr>
+                {% endif %}{% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:40px;color:#6b7280;">
+            <i class="bi bi-check-circle-fill" style="font-size:2rem;display:block;margin-bottom:10px;color:#10b981;"></i>
+            <div style="font-weight:600;color:#374151;font-size:.9rem;">All entities verified</div>
+            <div style="font-size:.78rem;margin-top:4px;">No pending approvals.</div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- END ADMIN VIEW -->
+
+    {% else %}
+    <!-- NORMAL STORE USER VIEW -->
+    <div class="dash-hero">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-4">
+        <div>
+          <div style="font-size:.68rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9ca3af;margin-bottom:8px;">WELCOME BACK</div>
+          <h1>
+            {{ store.name }}
+            {% if store.is_verified %}
+            <span class="verified-pill"><i class="bi bi-patch-check-fill" style="color:#2563eb;"></i> Verified Partner</span>
+            {% endif %}
+          </h1>
+          <p class="hero-meta"><i class="bi bi-geo-alt me-1"></i>{{ store.city }} &nbsp;·&nbsp; <i class="bi bi-file-earmark-text me-1"></i>License: {{ store.license_no }}</p>
+          <div class="hero-pills">
+            <span class="hero-pill"><i class="bi bi-stars" style="color:#f59e0b;"></i> {{ my_entries|length }} Active Pools</span>
+            <span class="hero-pill"><i class="bi bi-graph-up-arrow" style="color:#16a34a;"></i> Top 5% Savings</span>
+          </div>
+        </div>
+        <div class="wallet-card">
+          <div class="wallet-label">Wallet Balance</div>
+          <div class="wallet-amount">₹{{ store.wallet_balance }}</div>
+          <div class="wallet-sub"><i class="bi bi-arrow-up-short" style="color:#16a34a;"></i> Available balance</div>
+          <div class="wallet-btns">
+            <button class="btn-add" onclick="openAddFunds()">Add Funds</button>
+            <a href="{% url 'store_wallet' %}" class="btn-hist">History</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── KPI ROW ── -->
+    <div class="row g-3 mb-4">
+      <div class="col-12 col-md-4">
+        <a href="{% url 'low_stock_list' %}" style="text-decoration:none;">
+          <div class="kpi-card" style="border-top:3px solid #ef4444;">
+            <div class="kpi-top">
+              <div class="kpi-trend" style="color:#ef4444;"><i class="bi bi-arrow-down-short"></i>Needs attention</div>
+              <div class="kpi-icon" style="background:#fef2f2;"><i class="bi bi-exclamation-triangle" style="color:#ef4444;font-size:1.1rem;"></i></div>
+            </div>
+            <div class="kpi-num">{{ low_stock|length }}</div>
+            <div class="kpi-lbl">Low Stock Items</div>
+            <div class="kpi-divider"></div>
+            <span class="kpi-link">Check stock <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </a>
+      </div>
+      <div class="col-12 col-md-4">
+        <a href="{% url 'ai_predictions' %}" style="text-decoration:none;">
+          <div class="kpi-card" style="border-top:3px solid #f59e0b;">
+            <div class="kpi-top">
+              <div class="kpi-trend" style="color:#f59e0b;"><i class="bi bi-stars"></i> New insights</div>
+              <div class="kpi-icon" style="background:#fffbeb;"><i class="bi bi-cpu" style="color:#f59e0b;font-size:1.1rem;"></i></div>
+            </div>
+            <div class="kpi-num">{{ alerts|length }}</div>
+            <div class="kpi-lbl">AI Predictions</div>
+            <div class="kpi-divider"></div>
+            <span class="kpi-link" style="color:#f59e0b;">View predictions <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </a>
+      </div>
+      <div class="col-12 col-md-4">
+        <a href="{% url 'map_view' %}" style="text-decoration:none;">
+          <div class="kpi-card" style="border-top:3px solid #0891b2;">
+            <div class="kpi-top">
+              <div class="kpi-trend" style="color:#0891b2;"><i class="bi bi-geo-alt"></i> Your location</div>
+              <div class="kpi-icon" style="background:#ecfeff;"><i class="bi bi-building" style="color:#0891b2;font-size:1.1rem;"></i></div>
+            </div>
+            <div class="kpi-num" style="font-size:1.5rem;">{{ store.city }}</div>
+            <div class="kpi-lbl">Your Location</div>
+            <div class="kpi-divider"></div>
+            <span class="kpi-link">View map <i class="bi bi-arrow-right"></i></span>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- ── MAIN CONTENT ── -->
+    <div class="row g-4 align-items-stretch">
+
+      <!-- LEFT: 8 cols — AI Predictions only -->
+      <div class="col-xl-8">
+
+        <!-- AI Predictions -->
+        {% if alerts %}
+        <div class="ai-card">
+          <div class="ai-head">
+            <div class="d-flex align-items-center gap-3">
+              <div class="s-icon" style="background:#fef3c7;font-size:1.1rem;">🧠</div>
+              <div>
+                <div style="font-weight:700;font-size:.95rem;color:#111827;">AI Demand Predictions</div>
+                <div style="font-size:.72rem;color:#92400e;">Powered by seasonal forecasting</div>
+              </div>
+            </div>
+            <span class="ai-pill">✨ Next 15 days</span>
+          </div>
+          {% for alert in alerts %}
+          <div class="ai-row">
+            <div class="ai-num">{{ forloop.counter }}</div>
+            <div class="flex-fill">
+              <div class="ai-name">
+                {{ alert.product.name }}
+                <span class="hd-badge"><i class="bi bi-lightning-charge-fill" style="color:#f59e0b;"></i> HIGH DEMAND</span>
+              </div>
+              <div class="ai-reason">{{ alert.reason }}</div>
+            </div>
+            <div class="ai-meta">
+              <span class="pill-date"><i class="bi bi-calendar3"></i> {{ alert.demand_spike_date }}</span>
+              <span class="pill-units"><i class="bi bi-box"></i> Est. {{ alert.predicted_demand }} units</span>
+            </div>
+            <a href="{% url 'pool_list' %}" class="btn btn-primary btn-sm" style="white-space:nowrap;border-radius:10px;padding:8px 18px;font-weight:600;">Join Pool →</a>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+      </div><!-- /col-xl-8 -->
+
+    </div><!-- /main row -->
+
+    <!-- ── ACTIVE ORDERS — full width ── -->
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="s-card" style="display:flex;flex-direction:column;">
+          <div class="orders-card-head">
+            <div class="orders-card-title">
+              <div class="orders-s-icon"><i class="bi bi-box-seam" style="color:#fff;"></i></div>
+              Active Orders
+            </div>
+            <div class="d-flex gap-2">
+              <a href="{% url 'order_history' %}" class="btn btn-sm" style="background:#fff;color:#312e81;font-weight:700;border-radius:8px;">View All</a>
+            </div>
+          </div>
+          {% if my_entries %}
+          <div class="table-responsive">
+            <table class="table mb-0 orders-table" id="tbl-active-orders" data-paginate="5">
+              <thead>
+                <tr>
+                  <th>Medicine</th><th>Qty</th><th>Mode</th><th>Discount</th>
+                  <th>Total</th><th>Est. Arrival</th><th>Status</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for entry in my_entries %}
+                <tr>
+                  <td style="font-weight:600;color:#111827;">
+                    <a href="{% url 'pool_detail' entry.pool.id %}" style="color:#111827;text-decoration:none;">{{ entry.pool.product.name }}</a>
+                  </td>
+                  <td style="color:#4b5563;">{{ entry.quantity }} {{ entry.pool.product.unit }}s</td>
+                  <td>
+                    {% if entry.mode == 'urgent' %}<span class="mode-tag mode-urgent">⚡ Fast Track</span>
+                    {% else %}<span class="mode-tag mode-pool">⏳ Pool Mode</span>{% endif %}
+                  </td>
+                  <td style="font-weight:700;color:#16a34a;">{{ entry.discount_applied }}%</td>
+                  <td style="font-weight:700;color:#111827;">₹{{ entry.total_amount }}</td>
+                  <td>
+                    {% if entry.estimated_arrival %}
+                    <div class="eta-date">{{ entry.estimated_arrival|date:"d M, h:i A" }}</div>
+                    <div class="eta-hrs">~{{ entry.hours_until_arrival }}h left</div>
+                    {% else %}<span class="text-muted">—</span>{% endif %}
+                  </td>
+                  <td><span class="status-pill">{{ entry.pool.get_status_display }}</span></td>
+                  <td>
+                    <div class="d-flex gap-1 flex-wrap">
+                      <a href="{% url 'pool_detail' entry.pool.id %}" class="btn btn-sm btn-outline-primary" style="font-size:.72rem;padding:4px 10px;">View</a>
+                      {% for delivery in entry.pool.deliveries.all %}
+                        {% if delivery.store == store and delivery.status == 'dispatched' %}
+                        <a href="{% url 'track_delivery' delivery.id %}" class="btn btn-sm btn-primary" style="font-size:.72rem;padding:4px 10px;">🚚 Track</a>
+                        {% endif %}
+                      {% endfor %}
+                      {% if entry.pool.status == 'open' %}
+                      <a href="{% url 'cancel_order' entry.id %}" class="btn btn-sm btn-outline-danger" style="font-size:.72rem;padding:4px 10px;">Cancel</a>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div style="padding:14px 22px;border-top:1px solid #e0e7ff;background:#f5f3ff;display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:.78rem;color:#6366f1;font-weight:600;">{{ my_entries|length }} active order{{ my_entries|length|pluralize }}</span>
+            <a href="{% url 'order_history' %}" style="font-size:.78rem;font-weight:600;color:#7c3aed;text-decoration:none;">View order history <i class="bi bi-arrow-right"></i></a>
+          </div>
+          {% else %}
+          <div style="text-align:center;padding:48px 24px;color:#9ca3af;">
+            <div style="font-size:3rem;margin-bottom:12px;">📭</div>
+            <p style="font-size:.9rem;margin-bottom:14px;">No active orders yet.</p>
+            <a href="{% url 'search_medicines' %}" class="btn btn-primary">Search Medicines →</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── LIVE DELIVERIES ── -->
+    {% if active_deliveries %}
+    <div class="row g-4 mb-4">
+      <div class="col-12">
+        <div class="s-card">
+          <div style="background:linear-gradient(135deg,#064e3b,#059669);padding:16px 22px;display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:.95rem;color:#fff;display:flex;align-items:center;gap:10px;">
+              <div style="width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-truck" style="color:#fff;"></i></div>
+              🚚 Live Deliveries
+            </div>
+            <span style="font-size:.72rem;color:rgba(255,255,255,.75);">{{ active_deliveries|length }} in transit</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table mb-0" id="tbl-live-deliveries" data-paginate="5" style="font-size:.84rem;">
+              <thead style="background:#f0fdf4;">
+                <tr>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">Medicine</th>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">Qty</th>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">SLA</th>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">Est. Arrival</th>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">OTP</th>
+                  <th style="padding:10px 16px;font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:#059669;font-weight:700;border-bottom:2px solid #bbf7d0;">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for delivery in active_deliveries %}
+                <tr style="border-bottom:1px solid #f0fdf4;">
+                  <td style="padding:13px 16px;font-weight:600;color:#111827;">{{ delivery.pool.product.name }}</td>
+                  <td style="padding:13px 16px;color:#4b5563;">{{ delivery.quantity }} {{ delivery.pool.product.unit }}s</td>
+                  <td style="padding:13px 16px;">
+                    {% if delivery.pool.pool_mode == 'urgent' %}
+                    <span style="font-size:.72rem;background:#fef2f2;color:#dc2626;padding:3px 10px;border-radius:99px;font-weight:600;">⚡ 24h SLA</span>
+                    {% else %}
+                    <span style="font-size:.72rem;background:#ede9fe;color:#7c3aed;padding:3px 10px;border-radius:99px;font-weight:600;">⏳ 7-day SLA</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding:13px 16px;">
+                    {% if delivery.estimated_arrival %}
+                    <div style="font-size:.82rem;font-weight:600;color:#111827;">{{ delivery.estimated_arrival|date:"d M, h:i A" }}</div>
+                    {% else %}<span style="color:#9ca3af;">—</span>{% endif %}
+                  </td>
+                  <td style="padding:13px 16px;"><code style="font-size:.8rem;color:#059669;font-weight:700;">{{ delivery.delivery_otp }}</code></td>
+                  <td style="padding:13px 16px;">
+                    <div class="d-flex gap-2">
+                      <a href="{% url 'track_delivery' delivery.id %}" class="btn btn-sm btn-success" style="font-size:.72rem;padding:5px 12px;font-weight:700;">🗺️ Track Live</a>
+                      <a href="{% url 'confirm_delivery' delivery.id %}" class="btn btn-sm btn-outline-success" style="font-size:.72rem;padding:5px 12px;">Confirm OTP</a>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── BOTTOM ROW: Quick Actions + Recent Activity ── -->
+    <div class="row g-4 mt-0">
+
+      <!-- Quick Actions: 2-col grid of action buttons -->
+      <div class="col-lg-5">
+        <div class="s-card h-100">
+          <div class="qa-card-head">
+            <div class="qa-card-title">Quick Actions</div>
+            <i class="bi bi-stars" style="color:rgba(255,255,255,.8);font-size:1.1rem;"></i>
+          </div>
+          <div class="row g-0">
+            <div class="col-6" style="border-right:1px solid #f0fdf4;border-bottom:1px solid #f0fdf4;">
+              <a href="{% url 'search_medicines' %}" class="qa-block">
+                <div class="qa-block-icon" style="background:#f0fdf4;"><i class="bi bi-search" style="color:#059669;"></i></div>
+                <div class="qa-block-title">Search Medicines</div>
+                <div class="qa-block-sub">Find and compare prices</div>
+              </a>
+            </div>
+            <div class="col-6" style="border-bottom:1px solid #f0fdf4;">
+              <a href="{% url 'pool_list' %}" class="qa-block">
+                <div class="qa-block-icon" style="background:#ecfdf5;"><i class="bi bi-layers" style="color:#059669;"></i></div>
+                <div class="qa-block-title">Browse Pools</div>
+                <div class="qa-block-sub">Join active buying pools</div>
+              </a>
+            </div>
+            <div class="col-6" style="border-right:1px solid #f0fdf4;">
+              <a href="{% url 'map_view' %}" class="qa-block">
+                <div class="qa-block-icon" style="background:#fef9c3;"><i class="bi bi-geo-alt" style="color:#d97706;"></i></div>
+                <div class="qa-block-title">Nearby Pharmacies</div>
+                <div class="qa-block-sub">Connect with partners</div>
+              </a>
+            </div>
+            <div class="col-6">
+              <a href="{% url 'order_history' %}" class="qa-block">
+                <div class="qa-block-icon" style="background:#f0fdf4;"><i class="bi bi-file-text" style="color:#059669;"></i></div>
+                <div class="qa-block-title">Order History</div>
+                <div class="qa-block-sub">View past transactions</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="col-lg-7">
+        <div class="s-card h-100" style="display:flex;flex-direction:column;">
+          <div class="act-card-head">
+            <div class="act-card-title">Recent Activity</div>
+            <span class="act-card-meta"><i class="bi bi-clock"></i> Last 7 days</span>
+          </div>
+
+          <!-- All activity items, hidden by default, shown 6 at a time via JS -->
+          <div id="act-items" class="row g-0 flex-fill">
+            {% for entry in my_entries %}
+              {% for delivery in entry.pool.deliveries.all %}
+                {% if delivery.store == store %}
+                <div class="act-item col-12 col-md-6">
+                  <div class="act-row" style="border-right:1px solid #f3f4f6;">
+                    <div class="act-icon"><i class="bi bi-box-seam"></i></div>
+                    <div>
+                      <div class="act-title">Order Dispatched</div>
+                      <div class="act-sub">{{ entry.pool.product.name }} — {{ entry.quantity }} {{ entry.pool.product.unit }}s</div>
+                    </div>
+                    <a href="{% url 'track_delivery' delivery.id %}" class="act-time" style="text-decoration:none;">Track →</a>
+                  </div>
+                </div>
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+            {% for entry in my_entries %}
+            <div class="act-item col-12 col-md-6">
+              <div class="act-row" style="border-right:1px solid #f3f4f6;">
+                <div class="act-icon" style="position:relative;">
+                  <i class="bi bi-people"></i>
+                  <span style="position:absolute;bottom:-2px;right:-2px;width:10px;height:10px;border-radius:50%;background:#f59e0b;border:2px solid #fff;"></span>
+                </div>
+                <div>
+                  <div class="act-title">Pool Joined</div>
+                  <div class="act-sub">{{ entry.pool.product.name }} — {{ entry.quantity }} {{ entry.pool.product.unit }}s</div>
+                </div>
+                <span class="act-time">{{ entry.joined_at|timesince }} ago</span>
+              </div>
+            </div>
+            {% empty %}
+            <div class="col-12" style="text-align:center;padding:36px 20px;color:#9ca3af;">
+              <i class="bi bi-clock-history" style="font-size:2rem;display:block;margin-bottom:10px;"></i>
+              <p style="font-size:.82rem;margin:0;">No recent activity yet.</p>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Pagination controls -->
+          <div id="act-pagination" style="padding:12px 22px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+            <span id="act-page-info" style="font-size:.78rem;color:#6b7280;font-weight:500;"></span>
+            <div style="display:flex;gap:8px;">
+              <button id="act-prev" class="btn btn-sm btn-outline-secondary" style="padding:3px 12px;font-size:.75rem;">‹ Prev</button>
+              <button id="act-next" class="btn btn-sm btn-outline-secondary" style="padding:3px 12px;font-size:.75rem;">Next ›</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /bottom row -->
+  </div><!-- /container -->
+</div><!-- /dash-page -->
+
+{% endif %}{# end is_admin_view / store view #}
+
+<!-- ── Add Funds Modal ── -->
+<div class="modal fade" id="addFundsModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered" style="max-width:400px;">
+    <div class="modal-content" style="border-radius:16px;">
+      <div class="modal-header" style="background:linear-gradient(135deg,#0f172a,#1e3a8a);border-radius:16px 16px 0 0;">
+        <h5 class="modal-title" style="color:#fff;font-weight:700;"><i class="bi bi-wallet2 me-2"></i>Add Funds to Wallet</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="padding:28px;">
+        <p style="font-size:.85rem;color:#6b7280;margin-bottom:20px;">
+          Funds are added instantly to your BulkMed wallet and can be used for pool orders.
+        </p>
+        <div class="mb-3">
+          <label style="font-size:.82rem;font-weight:600;color:#374151;margin-bottom:6px;display:block;">Amount (₹)</label>
+          <input type="number" id="topup-amount" class="form-control" placeholder="e.g. 500" min="1" style="font-size:1.1rem;font-weight:700;text-align:center;">
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+          <button onclick="document.getElementById('topup-amount').value='500'"
+            style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹500</button>
+          <button onclick="document.getElementById('topup-amount').value='1000'"
+            style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹1000</button>
+          <button onclick="document.getElementById('topup-amount').value='2000'"
+            style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹2000</button>
+          <button onclick="document.getElementById('topup-amount').value='5000'"
+            style="padding:6px 14px;border-radius:99px;border:1.5px solid #e5e7eb;background:#fff;font-size:.8rem;font-weight:600;color:#374151;cursor:pointer;">₹5000</button>
+        </div>
+        <div id="topup-result" class="mb-3"></div>
+        <button onclick="initiatePayment()" class="btn btn-primary w-100" style="font-weight:700;padding:12px;font-size:.95rem;">
+          <i class="bi bi-credit-card me-2"></i>Pay with Razorpay
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const PER_PAGE = 5;
+  const container = document.getElementById('act-items');
+  if (!container) return;
+  const items = Array.from(container.querySelectorAll('.act-item'));
+  if (!items.length) { document.getElementById('act-pagination').style.display='none'; return; }
+
+  let page = 1;
+  const total = () => Math.ceil(items.length / PER_PAGE);
+
+  function render() {
+    const start = (page - 1) * PER_PAGE;
+    items.forEach((el, i) => el.style.display = (i >= start && i < start + PER_PAGE) ? '' : 'none');
+    document.getElementById('act-page-info').textContent = `Page ${page} of ${total()}`;
+    document.getElementById('act-prev').disabled = page === 1;
+    document.getElementById('act-next').disabled = page === total();
+    if (total() <= 1) document.getElementById('act-pagination').style.display = 'none';
+  }
+
+  document.getElementById('act-prev').onclick = () => { if (page > 1) { page--; render(); } };
+  document.getElementById('act-next').onclick = () => { if (page < total()) { page++; render(); } };
+  render();
+})();
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if is_admin_view %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ── Revenue Area Chart ─────────────────────────────────────────────────────
+const LABELS = {{ chart_labels_json|safe }};
+const VALUES = {{ chart_values_json|safe }};
+const CSRF   = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+const ctx = document.getElementById('revenueChart');
+if (ctx) {
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: LABELS,
+      datasets: [{
+        label: 'Commission Earned (₹)',
+        data:  VALUES,
+        fill:  true,
+        borderColor:     '#6366f1',
+        backgroundColor: 'rgba(99,102,241,.08)',
+        borderWidth:     2.5,
+        pointRadius:     VALUES.map(v => v > 0 ? 4 : 0),
+        pointBackgroundColor: '#6366f1',
+        tension: 0.4,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#fff',
+          borderColor:     '#e5e7eb',
+          borderWidth:     1,
+          titleColor:      '#111827',
+          bodyColor:       '#6366f1',
+          callbacks: {
+            label: ctx => ` ₹${ctx.parsed.y.toFixed(2)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid:  { color: '#f3f4f6' },
+          ticks: { color: '#6b7280', font: { size: 10 }, maxTicksLimit: 10 },
+        },
+        y: {
+          grid:  { color: '#f3f4f6' },
+          ticks: { color: '#6b7280', font: { size: 10 }, callback: v => '₹' + v },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+}
+
+// ── AJAX Refresh — live status cards ──────────────────────────────────────
+async function refreshStats() {
+  const btn = document.getElementById('refresh-btn');
+  btn.innerHTML = '<i class="bi bi-arrow-clockwise spin"></i> Refreshing…';
+  btn.disabled  = true;
+
+  try {
+    const res  = await fetch('/api/admin-stats/');
+    const data = await res.json();
+
+    // Update KPI numbers in-place
+    const map = {
+      'kpi-disputes':  data.open_disputes,
+      'kpi-payouts':   data.pending_payouts,
+      'kpi-pools':     data.active_pools,
+      'kpi-orders':    data.pending_orders,
+      'kpi-balance':   '₹' + parseFloat(data.platform_balance).toFixed(2),
+    };
+    Object.entries(map).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    });
+
+    btn.innerHTML = '<i class="bi bi-check-circle" style="color:#6ee7b7;"></i> Updated';
+    setTimeout(() => {
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Refresh';
+      btn.disabled  = false;
+    }, 2000);
+  } catch {
+    btn.innerHTML = '<i class="bi bi-x-circle" style="color:#f87171;"></i> Failed';
+    btn.disabled  = false;
+  }
+}
+
+// ── Verify factory via AJAX ────────────────────────────────────────────────
+async function verifyFactory(id) {
+  if (!confirm('Verify this factory?')) return;
+  const res  = await fetch(`/control/factory/${id}/verify/`, {
+    method:  'POST',
+    headers: { 'X-CSRFToken': CSRF },
+  });
+  const data = await res.json();
+  if (data.ok) {
+    // Remove the row from the table
+    document.querySelector(`tr[data-factory="${id}"]`)?.remove();
+    showAdminToast(data.message || 'Factory verified.', 'success');
+  } else {
+    showAdminToast(data.error || 'Verification failed.', 'danger');
+  }
+}
+
+function showAdminToast(msg, type) {
+  const t = document.createElement('div');
+  t.style.cssText = `position:fixed;bottom:24px;right:24px;z-index:9999;
+    background:${type === 'success' ? '#065f46' : '#7f1d1d'};
+    color:#fff;padding:12px 20px;border-radius:10px;font-size:.875rem;
+    font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.25);`;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { display:inline-block; animation: spin .8s linear infinite; }
+</style>
+{% else %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+// ── CSRF: read from the hidden input Django renders in every form,
+//    falling back to the cookie. The hidden input is always present
+//    (the logout form in the navbar uses {% csrf_token %}).
+function getCSRF() {
+  const el = document.querySelector('[name=csrfmiddlewaretoken]');
+  if (el) return el.value;
+  // cookie fallback
+  const match = document.cookie.match(/csrftoken=([^;]+)/);
+  return match ? match[1] : '';
+}
+
+function openAddFunds() {
+  new bootstrap.Modal(document.getElementById('addFundsModal')).show();
+}
+
+async function initiatePayment() {
+  const amount  = parseInt(document.getElementById('topup-amount').value);
+  const resultEl = document.getElementById('topup-result');
+
+  if (!amount || amount < 1) {
+    resultEl.innerHTML = '<div class="alert alert-danger py-2">Please enter a valid amount.</div>';
+    return;
+  }
+
+  resultEl.innerHTML = '<div class="text-muted py-2" style="font-size:.82rem;">Creating order…</div>';
+
+  let res, order;
+  try {
+    res   = await fetch('/wallet/create-order/', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+      body:    JSON.stringify({ amount }),
+    });
+    order = await res.json();
+  } catch (networkErr) {
+    resultEl.innerHTML = '';
+    alert('Network error — could not reach the server. Please check your connection and try again.');
+    return;
+  }
+
+  if (!res.ok) {
+    resultEl.innerHTML = '';
+    alert('Error: ' + (order.error || `Server returned ${res.status}`));
+    return;
+  }
+
+  resultEl.innerHTML = '';
+
+  const rzp = new Razorpay({
+    key:         order.key_id,
+    amount:      order.amount,
+    currency:    order.currency,
+    order_id:    order.order_id,
+    name:        'BulkMed',
+    description: `Wallet Top-up — ₹${amount}`,
+    image:       'https://i.imgur.com/n5tjHFD.png',  // BulkMed logo (replace with your CDN URL)
+
+    // Pre-fill user details — Razorpay uses contact for UPI VPA auto-detection
+    prefill: {
+      name:    order.name,
+      email:   order.email,
+      contact: order.contact,
+    },
+
+    // Enable all payment methods including UPI apps and QR code
+    // 'method' is the correct approach for test keys — works without Custom Checkout
+    method: {
+      upi:         true,
+      card:        true,
+      netbanking:  true,
+      wallet:      true,
+      paylater:    true,
+    },
+
+    theme: { color: '#2563eb' },
+
+    handler: async function(response) {
+      let vRes, vData;
+      try {
+        vRes  = await fetch('/wallet/verify-payment/', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRF() },
+          body:    JSON.stringify({
+            razorpay_order_id:   response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature:  response.razorpay_signature,
+            amount:              order.amount,
+          }),
+        });
+        vData = await vRes.json();
+      } catch (e) {
+        alert('Payment recorded by Razorpay but verification call failed. Please contact support.');
+        return;
+      }
+      if (vData.ok) {
+        resultEl.innerHTML = `<div class="alert alert-success py-2">✅ ${vData.message}</div>`;
+        document.querySelectorAll('.wallet-amount').forEach(el => el.textContent = '₹' + vData.balance);
+        setTimeout(() => location.reload(), 1500);
+      } else {
+        resultEl.innerHTML = `<div class="alert alert-danger py-2">❌ ${vData.error}</div>`;
+      }
+    },
+    modal: { ondismiss: () => { resultEl.innerHTML = ''; } },
+  });
+  rzp.open();
+}
+</script>
+{% endif %}{# end is_admin_view extra_js #}
+{% endblock %}

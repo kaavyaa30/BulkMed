@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block title %}Setup Store — BulkMed{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="page-header text-center">
+      <h2>Complete Your Store Profile</h2>
+      <p>You need a store profile to access pools and place orders.</p>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          <div class="row g-3">
+            {% for field in form %}
+            <div class="col-{% if field.name == 'address' %}12{% else %}6{% endif %}">
+              <label class="form-label">{{ field.label }}</label>
+              {{ field }}
+              {% if field.errors %}<div class="text-danger" style="font-size:.78rem;margin-top:4px;">{{ field.errors|join:", " }}</div>{% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          <button type="submit" class="btn btn-primary w-100 btn-lg mt-4">
+            <i class="bi bi-arrow-right me-2"></i>Save & Continue
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

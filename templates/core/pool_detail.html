@@ -1,0 +1,708 @@
+{% extends 'base.html' %}
+{% block title %}{{ pool.product.name }} — BulkMed{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Fee breakdown card — neutral SaaS style, inherits design system vars ── */
+  .fee-breakdown-card { border:1px solid var(--gray-200); border-radius:var(--radius); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .fee-breakdown-header { padding:12px 16px; background:var(--gray-50); border-bottom:1px solid var(--gray-200); }
+  .fee-breakdown-label { display:block; font-size:.62rem; font-weight:700; letter-spacing:.8px; text-transform:uppercase; color:var(--gray-400); margin-bottom:2px; }
+  .fee-breakdown-title { font-size:.875rem; font-weight:700; color:var(--gray-800); }
+  .fee-breakdown-body { padding:4px 0; }
+  .fee-row { display:flex; justify-content:space-between; align-items:flex-start; padding:9px 16px; }
+  .fee-row + .fee-row { border-top:1px solid var(--gray-100); }
+  .fee-row-sep { border-top:1px solid var(--gray-200) !important; padding-top:11px; }
+  .fee-row-total { border-top:2px solid var(--gray-200) !important; padding-top:12px; padding-bottom:12px; background:var(--gray-50); }
+  .fee-row-name { font-size:.82rem; color:var(--gray-600); display:flex; flex-direction:column; gap:2px; }
+  .fee-row-sub { font-size:.7rem; color:var(--gray-400); padding-left:22px; }
+  .fee-row-value { font-size:.82rem; font-weight:600; color:var(--gray-800); white-space:nowrap; padding-left:12px; }
+  .fee-row-total .fee-row-name { font-size:.9rem; font-weight:700; color:var(--gray-800); }
+  .fee-breakdown-note { margin:0 16px 12px; padding:8px 12px; background:var(--gray-50); border:1px solid var(--gray-200); border-radius:var(--radius-sm); font-size:.72rem; color:var(--gray-500); display:flex; align-items:flex-start; gap:6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-4">
+  <!-- Left: Pool Info -->
+  <div class="col-lg-7">
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-4">
+          <div>
+            <h3 style="font-weight:800;letter-spacing:-.5px;margin:0;">{{ pool.product.name }}</h3>
+            <p class="text-muted mb-0" style="font-size:.875rem;">{{ pool.product.factory_name }} · {{ pool.product.get_category_display }} · ₹{{ pool.product.base_price }}/{{ pool.product.unit }}</p>
+          </div>
+          <span class="discount-badge" style="font-size:1.3rem;">{{ pool.current_discount }}%</span>
+        </div>
+
+        <!-- Member progress -->
+        <div class="mb-4">
+          <div class="d-flex justify-content-between mb-2" style="font-size:.8rem;color:var(--gray-500);">
+            <span>
+              <i class="bi bi-people-fill me-1"></i>{{ pool.current_member_count }} / 15 stores
+              {% if pool.is_full %}<span style="font-size:.7rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;font-weight:700;border:1px solid #fecaca;margin-left:6px;">FULL</span>{% endif %}
+            </span>
+            {% if next_stores_needed > 0 and not pool.is_full %}
+            <span>{{ next_stores_needed }} more → <strong style="color:var(--success);">{{ next_discount }}% off</strong></span>
+            {% elif pool.current_discount == 10 %}
+            <span style="color:#16a34a;font-weight:700;">🎉 Max 10% discount reached</span>
+            {% endif %}
+          </div>
+          <div class="progress" style="height:8px;">
+            {% widthratio pool.current_member_count 15 100 as capacity_pct %}
+            <div class="progress-bar {% if pool.is_full %}bg-danger{% else %}bg-success{% endif %}" style="width:{{ capacity_pct }}%"></div>
+          </div>
+        </div>
+
+        <!-- Stats row -->
+        <div class="row g-3 mb-4">
+          <div class="col-4">
+            <div style="background:var(--gray-50);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:1.4rem;font-weight:800;color:var(--success);">{{ pool.current_discount }}%</div>
+              <div style="font-size:.72rem;color:var(--gray-500);margin-top:2px;">Current Discount</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div style="background:var(--gray-50);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div style="font-size:1.4rem;font-weight:800;color:var(--primary);">{{ next_discount }}%</div>
+              <div style="font-size:.72rem;color:var(--gray-500);margin-top:2px;">Next Tier</div>
+            </div>
+          </div>
+          <div class="col-4">
+            <div style="background:var(--gray-50);border-radius:var(--radius);padding:14px;text-align:center;">
+              <div class="countdown-pill justify-content-center" style="background:transparent;padding:0;">
+                <span data-expires="{{ pool.expires_at|date:'c' }}" style="font-size:1rem;font-weight:800;color:var(--danger);">Loading...</span>
+              </div>
+              <div style="font-size:.72rem;color:var(--gray-500);margin-top:2px;">Pool Closes In</div>
+            </div>
+          </div>
+        </div>
+
+        {% if next_stores_needed > 0 %}
+        <div class="alert alert-info">
+          <i class="bi bi-bell-fill me-2"></i>
+          <strong>{{ next_stores_needed }} more store(s)</strong> needed to unlock <strong>{{ next_discount }}% discount</strong> for everyone. Share this pool!
+        </div>
+        {% endif %}
+
+        <!-- Escrow & Cancellation Policy Notice -->
+        <div class="alert" style="background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;font-size:.8rem;margin-bottom:0;">
+          <div style="font-weight:700;color:#92400e;margin-bottom:4px;"><i class="bi bi-shield-lock me-1"></i>Advance Deposit & Cancellation Policy</div>
+          <ul style="margin:0;padding-left:16px;color:#78350f;">
+            <li><strong>10% wallet advance</strong> will be deducted when you join this pool.</li>
+            <li>Cancellations are <strong>free before the 80% time mark</strong> — advance is fully refunded.</li>
+            <li>Cancellations are <strong>blocked after the 80% mark</strong>.</li>
+            <li>Cancellation window closes at: <strong>{{ cancellation_lockout_time|date:"d M Y, h:i A" }}</strong></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Join / Order Summary -->
+  <div class="col-lg-5">
+    {% if my_entry %}
+    <!-- Already joined -->
+    <div class="card" style="border:2px solid var(--success);">
+      <div class="card-header" style="background:var(--success);color:#fff;">
+        <i class="bi bi-check-circle-fill me-2"></i>Your Order
+      </div>
+      <div class="card-body">
+        <table class="summary-table w-100 mb-4">
+          <tr><td>Medicine</td><td>{{ pool.product.name }}</td></tr>
+          <tr><td>Quantity</td><td>{{ my_entry.quantity }} {{ pool.product.unit }}s</td></tr>
+          <tr><td>Mode</td><td>
+            {% if my_entry.mode == 'urgent' %}
+              <span class="badge" style="background:var(--danger-light);color:var(--danger);">⚡ Fast Track</span>
+            {% else %}
+              <span class="badge" style="background:var(--info-light);color:var(--info);">⏳ Pool Mode</span>
+            {% endif %}
+          </td></tr>
+          <tr><td>Discount</td><td style="color:var(--success);font-weight:700;">{{ my_entry.discount_applied }}% OFF</td></tr>
+          <tr><td>Total</td><td style="font-weight:700;font-size:1rem;">₹{{ my_entry.total_amount }}</td></tr>
+          {% if my_entry.estimated_arrival %}
+          <tr><td>Est. Arrival</td><td>
+            <strong style="color:var(--primary);">{{ my_entry.estimated_arrival|date:"D, d M Y" }}</strong><br>
+            <span style="font-size:.78rem;color:var(--gray-500);">by {{ my_entry.estimated_arrival|date:"h:i A" }}</span><br>
+            <span class="countdown-pill mt-1">~{{ my_entry.hours_until_arrival }}h remaining</span>
+          </td></tr>
+          {% endif %}
+        </table>
+
+        <!-- Modify -->
+        <form method="post" class="mb-3">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="modify">
+          <label class="form-label">Modify Quantity</label>
+          <div class="input-group">
+            <input type="number" name="quantity" class="form-control" value="{{ my_entry.quantity }}" min="1">
+            <button type="submit" class="btn btn-outline-primary">Update</button>
+          </div>
+        </form>
+
+        <!-- Escrow info -->
+        {% if my_entry.escrow_amount > 0 %}
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;font-size:.78rem;margin-bottom:12px;">
+          <i class="bi bi-lock-fill me-1" style="color:#16a34a;"></i>
+          <strong>₹{{ my_entry.escrow_amount }}</strong> advance deposit held in escrow.
+          {% if not cancellation_locked %}Refundable if cancelled before {{ cancellation_lockout_time|date:"h:i A, d M" }}.{% endif %}
+        </div>
+        {% endif %}
+
+        {% if cancellation_locked %}
+        <div class="btn btn-outline-danger w-100 btn-sm disabled" style="opacity:.6;cursor:not-allowed;">
+          <i class="bi bi-lock-fill me-1"></i>Cancellation Locked
+        </div>
+        <p style="font-size:.72rem;color:#dc2626;text-align:center;margin-top:6px;margin-bottom:0;">
+          <i class="bi bi-exclamation-triangle me-1"></i>Pool is past 80% of its lifespan — cancellations are blocked.
+        </p>
+        {% else %}
+        <a href="{% url 'cancel_order' my_entry.id %}" class="btn btn-outline-danger w-100 btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Cancel Order
+        </a>
+        <p style="font-size:.72rem;color:var(--gray-400);text-align:center;margin-top:8px;margin-bottom:0;">
+          Cancellation window closes at <strong>{{ cancellation_lockout_time|date:"h:i A, d M" }}</strong>
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% else %}
+    <!-- Join form -->
+    {% if pool.status != 'open' %}
+    <div class="card" style="border:2px solid var(--gray-200);">
+      <div class="card-body text-center py-4">
+        <div style="font-size:2rem;">🔒</div>
+        <p class="fw-600 mt-2 mb-1">Pool is {{ pool.get_status_display }}</p>
+        <p class="text-muted" style="font-size:.875rem;">This pool is no longer accepting new orders.</p>
+        <a href="{% url 'pool_list' %}" class="btn btn-outline-primary btn-sm">Browse Open Pools</a>
+      </div>
+    </div>
+
+    {# ── Staff-only: member breakdown for dispatch ── #}
+    {% if request.user.is_staff %}
+    <div class="card mt-3" style="border:1.5px solid #d1fae5;">
+      <div class="card-header" style="background:linear-gradient(135deg,#065f46,#10b981);color:#fff;font-weight:700;">
+        <i class="bi bi-people-fill me-2"></i>Joined Stores — Dispatch Breakdown
+        <span style="float:right;font-size:.75rem;opacity:.85;">{{ pool.current_member_count }} store{{ pool.current_member_count|pluralize }} · {{ pool.total_qty }} units total</span>
+      </div>
+      <div class="card-body p-0">
+        {% with pool.entries.all as entries %}
+        {% if entries %}
+        <div class="table-responsive">
+          <table class="table table-sm mb-0" style="font-size:.82rem;">
+            <thead style="background:#f0fdf4;">
+              <tr>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Store</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">City</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Mode</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Qty</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Unit Price</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Discount</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Total</th>
+                <th style="padding:10px 14px;color:#065f46;font-size:.68rem;text-transform:uppercase;letter-spacing:.4px;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for entry in entries %}
+              <tr style="border-bottom:1px solid #f0fdf4;">
+                <td style="padding:11px 14px;font-weight:600;color:#111827;">{{ entry.store.name }}</td>
+                <td style="padding:11px 14px;color:#6b7280;font-size:.78rem;">{{ entry.store.city }}</td>
+                <td style="padding:11px 14px;">
+                  {% if entry.mode == 'urgent' %}
+                  <span style="font-size:.7rem;background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:99px;font-weight:600;">⚡ Fast</span>
+                  {% else %}
+                  <span style="font-size:.7rem;background:#ede9fe;color:#7c3aed;padding:2px 8px;border-radius:99px;font-weight:600;">⏳ Pool</span>
+                  {% endif %}
+                </td>
+                <td style="padding:11px 14px;font-weight:700;color:#374151;">{{ entry.quantity }} <span style="font-size:.7rem;color:#9ca3af;">{{ pool.product.unit }}s</span></td>
+                <td style="padding:11px 14px;color:#374151;">₹{{ entry.unit_price_at_order }}</td>
+                <td style="padding:11px 14px;color:#10b981;font-weight:600;">{{ entry.discount_applied }}%</td>
+                <td style="padding:11px 14px;font-weight:700;color:#111827;">₹{{ entry.total_amount }}</td>
+                <td style="padding:11px 14px;">
+                  {% if entry.status == 'active' %}
+                  <span style="font-size:.7rem;background:#f0fdf4;color:#16a34a;padding:2px 8px;border-radius:99px;font-weight:600;border:1px solid #bbf7d0;">Active</span>
+                  {% elif entry.status == 'delivered' %}
+                  <span style="font-size:.7rem;background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:99px;font-weight:600;border:1px solid #bfdbfe;">Delivered</span>
+                  {% else %}
+                  <span style="font-size:.7rem;background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:99px;font-weight:600;">{{ entry.get_status_display }}</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot>
+              <tr style="background:#f0fdf4;border-top:2px solid #d1fae5;">
+                <td colspan="3" style="padding:10px 14px;font-size:.75rem;font-weight:700;color:#065f46;text-transform:uppercase;">Pool Totals</td>
+                <td style="padding:10px 14px;font-weight:800;color:#111827;">{{ pool.total_qty }} units</td>
+                <td colspan="4"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        {% else %}
+        <div style="text-align:center;padding:24px;color:#9ca3af;font-size:.875rem;">No entries in this pool.</div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+    {% endif %}{# end is_staff #}
+    {% elif pool.is_full and not my_entry %}
+    <div class="card" style="border:2px solid #fecaca;">
+      <div class="card-body text-center py-4">
+        <div style="font-size:2rem;">🚫</div>
+        <p class="fw-bold mt-2 mb-1" style="color:#dc2626;">Pool is Full</p>
+        <p class="text-muted" style="font-size:.875rem;">This pool has reached the maximum of 15 stores. No new stores can join.</p>
+        <a href="{% url 'pool_list' %}" class="btn btn-outline-danger btn-sm">Browse Other Pools</a>
+      </div>
+    </div>
+    {% else %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-plus-circle me-2 text-primary"></i>Join This Pool</div>
+      <div class="card-body">
+
+        {# Pay & Join form — no page reload, Razorpay popup on submit #}
+        <div id="join-error" class="alert alert-danger d-none mb-3" role="alert"></div>
+        <div id="join-success" class="alert alert-success d-none mb-3" role="alert"></div>
+
+        <div class="mb-4">
+          <label class="form-label">Quantity ({{ pool.product.unit }}s) <span style="font-size:.75rem;color:#6b7280;">— minimum 4</span></label>
+          <input type="text" inputmode="numeric" pattern="[0-9]*"
+                 id="pay-join-qty" class="form-control"
+                 value="4" placeholder="e.g. 50"
+                 autocomplete="off" spellcheck="false">
+          {# qty-error: shown by JS when quantity is invalid — value is never clamped #}
+          <div id="qty-error" class="d-none mt-2" role="alert"
+               style="font-size:.8rem;color:var(--danger);display:flex;align-items:center;gap:6px;">
+            <i class="bi bi-exclamation-circle-fill"></i>
+            <span id="qty-error-text"></span>
+          </div>
+          <div id="qty-hint" style="font-size:.72rem;color:#9ca3af;margin-top:4px;">
+            <i class="bi bi-info-circle me-1"></i>Each store must order at least 4 {{ pool.product.unit }}s.
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label">Order Mode</label>
+          {% if fast_track_available %}
+          <div class="mode-option">
+            <input type="radio" name="pay-join-mode" id="mode-urgent" value="urgent" class="me-2">
+            <label for="mode-urgent" style="cursor:pointer;">
+              <div class="mode-title">⚡ Fast Track</div>
+              <div class="mode-desc">2-hour pool window — delivered within 24 hours</div>
+            </label>
+          </div>
+          {% endif %}
+          <div class="mode-option">
+            <input type="radio" name="pay-join-mode" id="mode-pool" value="pool" class="me-2" checked>
+            <label for="mode-pool" style="cursor:pointer;">
+              <div class="mode-title">⏳ Pool Mode</div>
+              <div class="mode-desc">3-day pool window — higher discount as more stores join</div>
+            </label>
+          </div>
+          {% if not fast_track_available %}
+          <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;font-size:.78rem;margin-top:8px;">
+            <i class="bi bi-geo-alt-fill me-1" style="color:#d97706;"></i>
+            <strong>Fast Track not available in {{ store.city }}</strong> — no local warehouse in your city.
+          </div>
+          {% endif %}
+        </div>
+
+        {# Live escrow preview with fee breakdown #}
+        <div id="escrow-preview" style="margin-bottom:16px;">
+          <!-- Collapsed hint (shown before qty is entered) -->
+          <div id="escrow-hint" class="alert alert-success" style="font-size:.82rem;margin-bottom:0;">
+            <i class="bi bi-wallet2 me-1"></i>
+            <strong>10% advance deposit</strong> will be charged via Razorpay.
+            Enter a quantity above to see the full fee breakdown.
+          </div>
+          <!-- Full breakdown table (shown once qty ≥ 4) -->
+          <div id="escrow-breakdown" style="display:none;">
+            <div class="fee-breakdown-card">
+              <div class="fee-breakdown-header">
+                <span class="fee-breakdown-label">Payment Summary — 10% Advance</span>
+                <span class="fee-breakdown-title">Transparent Fee Breakdown</span>
+              </div>
+              <div class="fee-breakdown-body">
+                <div class="fee-row">
+                  <span class="fee-row-name">
+                    <i class="bi bi-capsule me-2 text-primary"></i>Pool Subtotal (Medicine Cost)
+                    <span class="fee-row-sub" id="pool-subtotal-note"></span>
+                  </span>
+                  <span class="fee-row-value">₹<span id="pool-bd-subtotal">0.00</span></span>
+                </div>
+                <div class="fee-row">
+                  <span class="fee-row-name">
+                    <i class="bi bi-truck me-2" style="color:var(--info);"></i>Estimated Logistics Charge
+                  </span>
+                  <span class="fee-row-value">₹<span id="pool-bd-logistics">0.00</span></span>
+                </div>
+                <div class="fee-row fee-row-sep">
+                  <span class="fee-row-name">
+                    <i class="bi bi-shield-lock me-2" style="color:var(--warning);"></i>Secure Payment Gateway Fee
+                    <span class="fee-row-sub">Razorpay — 2% of Subtotal + Logistics</span>
+                  </span>
+                  <span class="fee-row-value" style="color:var(--warning);">₹<span id="pool-bd-gateway">0.00</span></span>
+                </div>
+                <div class="fee-row">
+                  <span class="fee-row-name">
+                    <i class="bi bi-receipt me-2" style="color:var(--gray-500);"></i>Taxes on Gateway Fee
+                    <span class="fee-row-sub">18% GST on Gateway Fee</span>
+                  </span>
+                  <span class="fee-row-value" style="color:var(--gray-600);">₹<span id="pool-bd-gst">0.00</span></span>
+                </div>
+                <div class="fee-row fee-row-total">
+                  <span class="fee-row-name">
+                    <i class="bi bi-check-circle-fill me-2 text-success"></i>Total Payable Amount
+                    <span class="fee-row-sub" style="padding-left:22px;">10% advance charged now via Razorpay</span>
+                  </span>
+                  <span class="fee-row-value text-success" style="font-size:1rem;">₹<span id="pool-bd-total">0.00</span></span>
+                </div>
+                <div class="fee-breakdown-note">
+                  <i class="bi bi-info-circle"></i>
+                  Full order value ₹<span id="pool-full-order">0.00</span> is due on delivery confirmation.
+                  Gateway fee &amp; GST are non-refundable.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-light mb-4" style="font-size:.78rem;">
+          <i class="bi bi-shield-lock me-1"></i>
+          Stock is validated before payment. If payment fails or is cancelled, you will <strong>not</strong> be added to the pool.
+          Cancellations are free while the pool is open · ₹200 penalty after lock-in.
+        </div>
+
+        <button id="pay-join-btn" type="button" class="btn btn-primary w-100 btn-lg"
+                onclick="startPayAndJoin()">
+          <i class="bi bi-credit-card me-2"></i>Pay & Join Pool
+        </button>
+
+        <p style="font-size:.72rem;color:#9ca3af;text-align:center;margin-top:8px;margin-bottom:0;">
+          Powered by Razorpay · UPI · Cards · Net Banking
+        </p>
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<!-- Confirmation Modal -->
+{% if show_confirmation %}
+<div class="modal fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header" style="background:var(--success);color:#fff;border-radius:var(--radius-lg) var(--radius-lg) 0 0;">
+        <h5 class="modal-title"><i class="bi bi-check-circle-fill me-2"></i>Order Confirmed!</h5>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Your order for <strong>{{ pool.product.name }}</strong> has been placed.</p>
+        <div style="background:var(--gray-50);border-radius:var(--radius);padding:16px;margin-bottom:16px;">
+          <div class="d-flex justify-content-between mb-2"><span class="text-muted">Quantity</span><strong>{{ my_entry.quantity }} {{ pool.product.unit }}s</strong></div>
+          <div class="d-flex justify-content-between mb-2"><span class="text-muted">Discount</span><strong style="color:var(--success);">{{ my_entry.discount_applied }}% OFF</strong></div>
+          <div class="d-flex justify-content-between"><span class="text-muted">Est. Arrival</span><strong>{{ my_entry.estimated_arrival|date:"D, d M Y" }}</strong></div>
+        </div>
+        <div class="alert alert-warning" style="font-size:.8rem;">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          You can modify this order while the pool is open. Once locked, cancellation incurs a <strong>₹200 penalty</strong>.
+        </div>
+        <p style="font-size:.75rem;color:var(--gray-400);margin:0;">A confirmation email has been sent to your registered address.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-success" data-bs-dismiss="modal">Got it</button>
+        <a href="{% url 'pool_list' %}" class="btn btn-outline-primary">Browse More Pools</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+const POOL_ID       = '{{ pool.id }}';
+const BASE_PRICE    = {{ pool.product.base_price }};
+const DISCOUNT      = {{ pool.current_discount }};
+const UNIT_LABEL    = '{{ pool.product.unit }}';
+const CHECK_URL     = `/pools/${POOL_ID}/check-stock/`;
+const JOIN_URL      = `/pools/${POOL_ID}/join-after-payment/`;
+const CSRF          = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+// ── Fee constants (mirrors services.py) ───────────────────────────────────
+const RAZORPAY_FEE_RATE = 0.02;
+const GST_ON_FEE_RATE   = 0.18;
+
+function computeBreakdown(subtotal, logistics = 0) {
+  const base         = subtotal + logistics;
+  const gateway      = Math.round(base * RAZORPAY_FEE_RATE * 100) / 100;
+  const gst          = Math.round(gateway * GST_ON_FEE_RATE * 100) / 100;
+  const totalFee     = Math.round((gateway + gst) * 100) / 100;
+  const totalPayable = Math.round((base + totalFee) * 100) / 100;
+  return { subtotal, logistics, gateway, gst, totalFee, totalPayable };
+}
+
+function fmt(n) { return parseFloat(n).toFixed(2); }
+
+// ── Quantity validation helpers ────────────────────────────────────────────
+// Never clamps or changes the value the user typed.
+// Returns { valid: bool, reason: string|null }
+function validateQty(qty) {
+  // Reject anything that isn't a clean positive integer
+  // (guards against letters, decimals, or empty strings since input is now type="text")
+  if (!qty || isNaN(qty) || !Number.isInteger(qty) || qty <= 0) {
+    return { valid: false, reason: null }; // empty / non-numeric — silent, no error shown
+  }
+  if (qty < 4) {
+    return { valid: false, reason: `Minimum order is 4 ${UNIT_LABEL}s.` };
+  }
+  return { valid: true, reason: null };
+}
+
+// Show a red error below the input and disable the Pay button.
+// Pass null to clear the error and re-enable the button.
+function setQtyError(message) {
+  const input   = document.getElementById('pay-join-qty');
+  const errorEl = document.getElementById('qty-error');
+  const textEl  = document.getElementById('qty-error-text');
+  const btn     = document.getElementById('pay-join-btn');
+
+  if (message) {
+    // Show error state
+    input.classList.add('is-invalid');
+    input.classList.remove('is-valid');
+    textEl.textContent = message;
+    errorEl.classList.remove('d-none');
+    errorEl.style.display = 'flex';
+    if (btn) { btn.disabled = true; }
+  } else {
+    // Clear error state
+    input.classList.remove('is-invalid');
+    errorEl.classList.add('d-none');
+    errorEl.style.display = 'none';
+    if (btn) { btn.disabled = false; }
+  }
+}
+
+// ── Live fee breakdown preview ─────────────────────────────────────────────
+// Runs on every keystroke. Never modifies the input value.
+function updateEscrowPreview() {
+  const rawVal      = document.getElementById('pay-join-qty')?.value;
+  const qty         = parseInt(rawVal, 10);
+  const hintEl      = document.getElementById('escrow-hint');
+  const breakdownEl = document.getElementById('escrow-breakdown');
+
+  const { valid, reason } = validateQty(qty);
+
+  if (!valid) {
+    // Show the error message if there is one (e.g. "Minimum 4"), or stay silent
+    // for an empty/partial input. Either way, hide the breakdown.
+    setQtyError(reason);
+    if (hintEl)      hintEl.style.display     = 'block';
+    if (breakdownEl) breakdownEl.style.display = 'none';
+    return;
+  }
+
+  // qty is valid — clear any previous error and render the breakdown
+  setQtyError(null);
+
+  const discPrice = BASE_PRICE * (1 - DISCOUNT / 100);
+  const fullOrder = Math.round(discPrice * qty * 100) / 100;
+  const escrow    = Math.round(fullOrder * 0.10 * 100) / 100; // 10% advance
+  const bd        = computeBreakdown(escrow, 0);
+
+  document.getElementById('pool-bd-subtotal').textContent  = fmt(bd.subtotal);
+  document.getElementById('pool-bd-logistics').textContent = fmt(bd.logistics);
+  document.getElementById('pool-bd-gateway').textContent   = fmt(bd.gateway);
+  document.getElementById('pool-bd-gst').textContent       = fmt(bd.gst);
+  document.getElementById('pool-bd-total').textContent     = fmt(bd.totalPayable);
+  document.getElementById('pool-full-order').textContent   = fmt(fullOrder);
+
+  const noteEl = document.getElementById('pool-subtotal-note');
+  if (noteEl) noteEl.textContent = `10% of ₹${fmt(fullOrder)} full order value`;
+
+  if (hintEl)      hintEl.style.display     = 'none';
+  if (breakdownEl) breakdownEl.style.display = 'block';
+}
+
+document.getElementById('pay-join-qty')?.addEventListener('input', updateEscrowPreview);
+updateEscrowPreview(); // run once on page load with the default value of 4
+
+// Block non-numeric keystrokes on the quantity field.
+// Allows: digits 0-9, Backspace, Delete, Tab, Enter, arrow keys, Ctrl/Cmd shortcuts.
+document.getElementById('pay-join-qty')?.addEventListener('keydown', function(e) {
+  const allowed = [
+    'Backspace', 'Delete', 'Tab', 'Enter',
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+    'Home', 'End',
+  ];
+  if (allowed.includes(e.key)) return;
+  if (e.ctrlKey || e.metaKey) return;  // allow Ctrl+A, Ctrl+C, Ctrl+V etc.
+  if (!/^\d$/.test(e.key)) e.preventDefault();  // block anything that isn't a digit
+});
+
+// ── Main Pay & Join flow ───────────────────────────────────────────────────
+async function startPayAndJoin() {
+  const btn       = document.getElementById('pay-join-btn');
+  const errorEl   = document.getElementById('join-error');
+  const successEl = document.getElementById('join-success');
+  const qty       = parseInt(document.getElementById('pay-join-qty')?.value || 0, 10);
+  const modeEl    = document.querySelector('input[name="pay-join-mode"]:checked');
+  const mode      = modeEl ? modeEl.value : 'pool';
+
+  errorEl.classList.add('d-none');
+  successEl.classList.add('d-none');
+
+  // Re-run client-side validation before hitting the server.
+  // This catches cases where the user bypasses the input event (e.g. form autofill).
+  const { valid, reason } = validateQty(qty);
+  if (!valid) {
+    setQtyError(reason || `Minimum order is 4 ${UNIT_LABEL}s.`);
+    return;
+  }
+
+  // ── Step 1: Server-side stock check + create Razorpay order ──────────────
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Checking stock…';
+
+  let checkData;
+  try {
+    const res = await fetch(CHECK_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body:    JSON.stringify({ quantity: qty, mode }),
+    });
+    checkData = await res.json();
+  } catch (e) {
+    showJoinError('Network error. Please check your connection and try again.');
+    return;
+  }
+
+  if (!checkData.ok) {
+    // Surface the server's error (e.g. "Only 18 strips available") inline
+    // below the quantity input so the user knows exactly what to fix.
+    const serverMsg = checkData.error || 'Stock check failed. Please try again.';
+    setQtyError(serverMsg);
+    showJoinError(serverMsg);
+    return;
+  }
+
+  // Server confirmed the quantity — update breakdown with authoritative values
+  if (checkData.fee_breakdown) {
+    const bd = checkData.fee_breakdown;
+    document.getElementById('pool-bd-subtotal').textContent   = parseFloat(bd.subtotal).toFixed(2);
+    document.getElementById('pool-bd-logistics').textContent  = parseFloat(bd.logistics).toFixed(2);
+    document.getElementById('pool-bd-gateway').textContent    = parseFloat(bd.gateway_fee).toFixed(2);
+    document.getElementById('pool-bd-gst').textContent        = parseFloat(bd.gst_on_fee).toFixed(2);
+    document.getElementById('pool-bd-total').textContent      = parseFloat(bd.total_payable).toFixed(2);
+    document.getElementById('escrow-hint').style.display      = 'none';
+    document.getElementById('escrow-breakdown').style.display = 'block';
+  }
+
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Opening payment…';
+
+  // ── Step 2: Open Razorpay checkout ────────────────────────────────────────
+  const rzp = new Razorpay({
+    key:         checkData.key_id,
+    amount:      checkData.amount,
+    currency:    checkData.currency,
+    order_id:    checkData.order_id,
+    name:        'BulkMed',
+    description: `Pool Escrow — ${checkData.product_name} (${qty} units)`,
+    prefill:     { name: checkData.name, email: checkData.email, contact: checkData.contact },
+    method: {
+      upi:        true,
+      card:       true,
+      netbanking: true,
+      wallet:     true,
+      paylater:   true,
+    },
+    theme: { color: '#2563eb' },
+
+    // ── Step 3: Payment success → create OrderEntry ───────────────────────
+    handler: async function(response) {
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Confirming order…';
+
+      let joinData;
+      try {
+        const vRes = await fetch(JOIN_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+          body:    JSON.stringify({
+            razorpay_order_id:   response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature:  response.razorpay_signature,
+            quantity:            qty,
+            mode:                mode,
+            escrow_amount:       checkData.escrow_amount,
+          }),
+        });
+        joinData = await vRes.json();
+      } catch (e) {
+        showJoinError(
+          'Payment was successful but order confirmation failed. ' +
+          'Please contact support with your payment ID: ' + response.razorpay_payment_id
+        );
+        return;
+      }
+
+      if (joinData.ok) {
+        successEl.textContent = joinData.message || 'Successfully joined the pool!';
+        successEl.classList.remove('d-none');
+        btn.innerHTML = '✅ Joined!';
+        setTimeout(() => { window.location.href = joinData.redirect_url || window.location.href; }, 1200);
+      } else {
+        showJoinError(joinData.error || 'Order confirmation failed. Please contact support.');
+      }
+    },
+
+    modal: {
+      ondismiss: () => {
+        showJoinError('Payment was cancelled. You have not been added to the pool. Please try again.');
+      },
+    },
+  });
+
+  rzp.open();
+}
+
+// Show a dismissible error in the join-error alert banner (top of the form).
+// This is separate from setQtyError — the banner is for flow-level errors,
+// the inline error is for quantity-specific feedback.
+function showJoinError(msg) {
+  const btn     = document.getElementById('pay-join-btn');
+  const errorEl = document.getElementById('join-error');
+  errorEl.textContent = msg;
+  errorEl.classList.remove('d-none');
+  btn.disabled  = false;
+  btn.innerHTML = '<i class="bi bi-credit-card me-2"></i>Pay & Join Pool';
+}
+
+// ── Countdown timer ────────────────────────────────────────────────────────
+document.querySelectorAll('[data-expires]').forEach(el => {
+  const expires = new Date(el.dataset.expires);
+  function update() {
+    const diff = expires - new Date();
+    if (diff <= 0) { el.textContent = 'Expired'; return; }
+    const h = Math.floor(diff / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    el.textContent = `${h}h ${m}m`;
+  }
+  update();
+  setInterval(update, 60000);
+});
+
+{% if show_confirmation %}
+new bootstrap.Modal(document.getElementById('confirmModal')).show();
+{% endif %}
+
+if (new URLSearchParams(window.location.search).get('joined') === '1') {
+  const modal = document.getElementById('confirmModal');
+  if (modal) new bootstrap.Modal(modal).show();
+}
+</script>
+{% endblock %}

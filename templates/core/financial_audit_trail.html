@@ -1,0 +1,403 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Financial Audit Trail — BulkMed{% endblock %}
+
+{% block extra_css %}
+<style>
+  .audit-page { background:#f1f5f9; min-height:calc(100vh - 64px); padding:28px 0 48px; }
+
+  /* ── Hero ── */
+  .audit-hero {
+    background: linear-gradient(135deg,#1e3a8a 0%,#3b82f6 55%,#0891b2 100%);
+    border-radius:20px; padding:28px 32px; margin-bottom:24px;
+    box-shadow:0 8px 32px rgba(30,58,138,.25);
+  }
+  .audit-hero h1 { font-size:1.7rem; font-weight:800; color:#fff; margin:0; letter-spacing:-.5px; }
+  .audit-hero p  { color:rgba(255,255,255,.75); font-size:.85rem; margin:6px 0 0; }
+
+  /* ── Summary cards ── */
+  .sum-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:14px;
+    padding:18px 20px 14px; box-shadow:0 2px 10px rgba(0,0,0,.05);
+    overflow:hidden; position:relative;
+  }
+  .sum-card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:3px;
+    border-radius:14px 14px 0 0;
+  }
+  .sum-card.green::before  { background:linear-gradient(90deg,#10b981,#34d399); }
+  .sum-card.blue::before   { background:linear-gradient(90deg,#2563eb,#60a5fa); }
+  .sum-card.amber::before  { background:linear-gradient(90deg,#f59e0b,#fcd34d); }
+  .sum-card.red::before    { background:linear-gradient(90deg,#dc2626,#f87171); }
+  .sum-card.indigo::before { background:linear-gradient(90deg,#6366f1,#a5b4fc); }
+  .sum-card .lbl { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:#6b7280; margin-bottom:8px; }
+  .sum-card .val { font-size:1.55rem; font-weight:800; letter-spacing:-1px; line-height:1; }
+  .sum-card .sub { font-size:.7rem; color:#9ca3af; margin-top:5px; }
+
+  /* ── Table card ── */
+  .table-card { background:#fff; border:1px solid #e5e7eb; border-radius:16px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+  .table-head-bar {
+    background:linear-gradient(135deg,#1e1b4b,#4338ca);
+    padding:14px 22px; display:flex; justify-content:space-between; align-items:center;
+  }
+  .table-head-bar .title { font-weight:700; font-size:.9rem; color:#fff; display:flex; align-items:center; gap:8px; }
+  .table-head-bar .count { font-size:.72rem; color:rgba(255,255,255,.75); background:rgba(255,255,255,.15); padding:3px 10px; border-radius:99px; }
+
+  .audit-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+  .audit-table thead th {
+    padding:10px 14px; font-size:.67rem; text-transform:uppercase; letter-spacing:.5px;
+    color:#6b7280; font-weight:600; background:#f9fafb; border-bottom:1px solid #e5e7eb;
+    white-space:nowrap;
+  }
+  .audit-table tbody td { padding:13px 14px; border-bottom:1px solid #f3f4f6; vertical-align:middle; }
+  .audit-table tbody tr:last-child td { border-bottom:none; }
+  .audit-table tbody tr:hover { background:#fafafa; }
+
+  /* ── Label badges ── */
+  .lbl-badge {
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:.7rem; font-weight:700; padding:3px 10px; border-radius:99px;
+    white-space:nowrap;
+  }
+  .lbl-escrow_advance  { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
+  .lbl-final_payment   { background:#f0fdf4; color:#15803d; border:1px solid #bbf7d0; }
+  .lbl-commission      { background:#fdf4ff; color:#7e22ce; border:1px solid #e9d5ff; }
+  .lbl-escrow_refund   { background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; }
+  .lbl-factory_payout  { background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+  .lbl-dispute_refund  { background:#fefce8; color:#854d0e; border:1px solid #fef08a; }
+  .lbl-other           { background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+
+  /* ── Amount ── */
+  .amt-credit { font-weight:800; color:#10b981; }
+  .amt-debit  { font-weight:800; color:#dc2626; }
+
+  /* ── Proof breakdown ── */
+  .proof { font-size:.72rem; color:#6b7280; margin-top:3px; }
+  .proof strong { color:#374151; }
+
+  /* ── Empty state ── */
+  .empty-state { text-align:center; padding:56px 24px; color:#9ca3af; }
+  .empty-state i { font-size:2.5rem; display:block; margin-bottom:12px; }
+</style>
+{% endblock %}
+
+{% block full_page %}
+{% load static %}
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg">
+  <div class="container-fluid px-4">
+    <a class="navbar-brand" href="/"><div class="brand-icon">💊</div>BulkMed</a>
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navMenu">
+      <ul class="navbar-nav ms-auto align-items-center gap-1">
+        <li class="nav-item"><a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house me-1"></i>Home</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'dashboard' %}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" href="{% url 'control_panel' %}"><i class="bi bi-gear me-1"></i>Control Panel</a></li>
+        <li class="nav-item ms-2">
+          <form method="post" action="{% url 'logout' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="nav-logout-btn"><i class="bi bi-box-arrow-right me-1"></i>Logout</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="audit-page">
+  <div class="container-fluid px-4" style="max-width:1400px;margin:0 auto;">
+
+    {# ── Hero ── #}
+    <div class="audit-hero">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div>
+          <div style="font-size:.65rem;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.7);margin-bottom:6px;">SUPERADMIN · FINANCIAL AUDIT TRAIL</div>
+          <h1>Platform Ledger</h1>
+          <p>Every rupee movement — with full proof of calculation.</p>
+        </div>
+        <a href="{% url 'dashboard' %}" style="background:rgba(255,255,255,.15);border:1.5px solid rgba(255,255,255,.3);border-radius:10px;padding:9px 16px;color:#fff;font-size:.82rem;font-weight:700;text-decoration:none;display:flex;align-items:center;gap:6px;">
+          <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+    </div>
+
+    {# ── Summary Row ── #}
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card green">
+          <div class="lbl">Total In</div>
+          <div class="val" style="color:#10b981;">₹{{ agg.total_credits|floatformat:2|intcomma }}</div>
+          <div class="sub">All credits</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card red">
+          <div class="lbl">Total Out</div>
+          <div class="val" style="color:#dc2626;">₹{{ agg.total_debits|floatformat:2|intcomma }}</div>
+          <div class="sub">All debits</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card blue">
+          <div class="lbl">Escrow Advances</div>
+          <div class="val" style="color:#2563eb;">₹{{ agg.escrow_in|floatformat:2|intcomma }}</div>
+          <div class="sub">10% on join</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card green">
+          <div class="lbl">Final Payments</div>
+          <div class="val" style="color:#10b981;">₹{{ agg.final_in|floatformat:2|intcomma }}</div>
+          <div class="sub">90% on delivery</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card indigo">
+          <div class="lbl">Commission</div>
+          <div class="val" style="color:#6366f1;">₹{{ agg.commission|floatformat:2|intcomma }}</div>
+          <div class="sub">15% platform cut</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="sum-card amber">
+          <div class="lbl">Net Balance</div>
+          <div class="val" style="color:{% if net_balance >= 0 %}#10b981{% else %}#dc2626{% endif %};">
+            ₹{{ net_balance|floatformat:2|intcomma }}
+          </div>
+          <div class="sub">Credits − Debits</div>
+        </div>
+      </div>
+    </div>
+
+    {# ── Ledger Table ── #}
+    <div class="table-card">
+      <div class="table-head-bar">
+        <div class="title">
+          <div style="width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;"><i class="bi bi-journal-text" style="color:#a5b4fc;"></i></div>
+          Full Transaction Ledger
+        </div>
+        <span class="count">{{ transactions|length }} entries</span>
+      </div>
+
+      {% if transactions %}
+      <div class="table-responsive">
+        <table class="audit-table" id="tbl-audit" data-paginate="25">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Date &amp; Time</th>
+              <th>Transaction Type</th>
+              <th>User / Store</th>
+              <th>Medicine</th>
+              <th>Unit Price</th>
+              <th>Qty</th>
+              <th>Calculation Proof</th>
+              <th>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in transactions %}
+            <tr>
+              {# ── # ── #}
+              <td style="color:#9ca3af;font-size:.75rem;">{{ forloop.counter }}</td>
+
+              {# ── Date ── #}
+              <td style="white-space:nowrap;">
+                <div style="font-weight:600;font-size:.82rem;color:#111827;">{{ tx.created_at|date:"d M Y" }}</div>
+                <div style="font-size:.7rem;color:#9ca3af;">{{ tx.created_at|date:"H:i" }}</div>
+              </td>
+
+              {# ── Label badge ── #}
+              <td>
+                <span class="lbl-badge lbl-{{ tx.transaction_label }}">
+                  {% if tx.transaction_label == 'escrow_advance' %}
+                    <i class="bi bi-lock-fill"></i> +10% Advance (Escrow)
+                  {% elif tx.transaction_label == 'final_payment' %}
+                    <i class="bi bi-check-circle-fill"></i> +90% Final Payment
+                  {% elif tx.transaction_label == 'commission' %}
+                    <i class="bi bi-percent"></i> Commission (15%)
+                  {% elif tx.transaction_label == 'escrow_refund' %}
+                    <i class="bi bi-arrow-counterclockwise"></i> Escrow Refund
+                  {% elif tx.transaction_label == 'factory_payout' %}
+                    <i class="bi bi-building"></i> Factory Payout (85%)
+                  {% elif tx.transaction_label == 'dispute_refund' %}
+                    <i class="bi bi-shield-exclamation"></i> Dispute Refund
+                  {% else %}
+                    <i class="bi bi-three-dots"></i> {{ tx.get_transaction_label_display }}
+                  {% endif %}
+                </span>
+              </td>
+
+              {# ── User / Store ── #}
+              <td>
+                {% if tx.order_entry %}
+                  <div style="font-weight:600;color:#111827;font-size:.84rem;">{{ tx.order_entry.store.name }}</div>
+                  <div style="font-size:.7rem;color:#9ca3af;">{{ tx.order_entry.store.user.username }}</div>
+                {% elif tx.delivery %}
+                  <div style="font-weight:600;color:#111827;font-size:.84rem;">{{ tx.delivery.store.name }}</div>
+                  <div style="font-size:.7rem;color:#9ca3af;">via delivery #{{ tx.delivery.id }}</div>
+                {% else %}
+                  <span style="color:#9ca3af;font-size:.78rem;">—</span>
+                {% endif %}
+              </td>
+
+              {# ── Medicine ── #}
+              <td>
+                {% if tx.order_entry %}
+                  <div style="font-weight:600;color:#111827;font-size:.84rem;">{{ tx.order_entry.pool.product.name }}</div>
+                  <div style="font-size:.7rem;color:#9ca3af;">{{ tx.order_entry.pool.product.get_category_display }}</div>
+                {% elif tx.delivery %}
+                  <div style="font-weight:600;color:#111827;font-size:.84rem;">{{ tx.delivery.pool.product.name }}</div>
+                {% else %}
+                  <span style="color:#9ca3af;font-size:.78rem;">—</span>
+                {% endif %}
+              </td>
+
+              {# ── Unit Price ── #}
+              <td>
+                {% if tx.order_entry %}
+                  <span style="font-weight:600;color:#374151;">₹{{ tx.order_entry.unit_price_at_order|floatformat:2 }}</span>
+                  {% if tx.order_entry.discount_applied > 0 %}
+                  <div style="font-size:.68rem;color:#10b981;margin-top:2px;">−{{ tx.order_entry.discount_applied|floatformat:0 }}% disc.</div>
+                  {% endif %}
+                {% else %}
+                  <span style="color:#9ca3af;">—</span>
+                {% endif %}
+              </td>
+
+              {# ── Qty ── #}
+              <td>
+                {% if tx.order_entry %}
+                  <span style="font-weight:600;color:#374151;">{{ tx.order_entry.quantity }}</span>
+                  <span style="font-size:.7rem;color:#9ca3af;"> {{ tx.order_entry.pool.product.unit }}s</span>
+                {% elif tx.delivery %}
+                  <span style="font-weight:600;color:#374151;">{{ tx.delivery.quantity }}</span>
+                {% else %}
+                  <span style="color:#9ca3af;">—</span>
+                {% endif %}
+              </td>
+
+              {# ── Calculation Proof ── #}
+              <td style="min-width:220px;">
+                {% if tx.order_entry %}
+                  {% with e=tx.order_entry %}
+                  {% with disc_price=e.unit_price_at_order|floatformat:2 %}
+                  {% if tx.transaction_label == 'escrow_advance' %}
+                    <div class="proof">
+                      ₹<strong>{{ e.unit_price_at_order|floatformat:2 }}</strong>
+                      {% if e.discount_applied > 0 %}× (1 − {{ e.discount_applied|floatformat:0 }}%){% endif %}
+                      × <strong>{{ e.quantity }}</strong> units
+                      = ₹<strong>{{ e.total_amount|floatformat:2 }}</strong>
+                      × 10% = <strong>₹{{ tx.amount|floatformat:2|intcomma }}</strong>
+                      {% if tx.gateway_fee_amount > 0 %}
+                      <br><small style="color:var(--gray-400);font-size:.68rem;">
+                        <i class="bi bi-credit-card me-1"></i>Gateway: ₹{{ tx.gateway_fee_amount|floatformat:2 }} &nbsp;+&nbsp; GST: ₹{{ tx.gateway_gst_amount|floatformat:2 }}
+                      </small>
+                      {% endif %}
+                    </div>
+                  {% elif tx.transaction_label == 'final_payment' %}
+                    <div class="proof">
+                      Full order ₹<strong>{{ e.total_amount|floatformat:2|intcomma }}</strong>
+                      collected on OTP confirmation
+                      {% if tx.gateway_fee_amount > 0 %}
+                      <br><small style="color:var(--gray-400);font-size:.68rem;">
+                        <i class="bi bi-credit-card me-1"></i>Gateway: ₹{{ tx.gateway_fee_amount|floatformat:2 }} &nbsp;+&nbsp; GST: ₹{{ tx.gateway_gst_amount|floatformat:2 }}
+                      </small>
+                      {% endif %}
+                    </div>
+                  {% elif tx.transaction_label == 'commission' %}
+                    <div class="proof">
+                      ₹<strong>{{ e.total_amount|floatformat:2|intcomma }}</strong>
+                      × 15% = <strong>₹{{ tx.amount|floatformat:2|intcomma }}</strong>
+                      {% if tx.gateway_fee_amount > 0 %}
+                      <br><small style="color:var(--gray-400);font-size:.68rem;">
+                        <i class="bi bi-credit-card me-1"></i>Gateway: ₹{{ tx.gateway_fee_amount|floatformat:2 }} &nbsp;+&nbsp; GST: ₹{{ tx.gateway_gst_amount|floatformat:2 }}
+                      </small>
+                      {% endif %}
+                    </div>
+                  {% else %}
+                    <div class="proof">
+                      {{ tx.description|truncatechars:60 }}
+                      {% if tx.gateway_fee_amount > 0 %}
+                      <br><small style="color:var(--gray-400);font-size:.68rem;">
+                        <i class="bi bi-credit-card me-1"></i>Gateway: ₹{{ tx.gateway_fee_amount|floatformat:2 }} &nbsp;+&nbsp; GST: ₹{{ tx.gateway_gst_amount|floatformat:2 }}
+                      </small>
+                      {% endif %}
+                    </div>
+                  {% endif %}
+                  {% endwith %}
+                  {% endwith %}
+                {% else %}
+                  <div class="proof">
+                    {{ tx.description|truncatechars:70 }}
+                    {% if tx.gateway_fee_amount > 0 %}
+                    <br><small style="color:var(--gray-400);font-size:.68rem;">
+                      <i class="bi bi-credit-card me-1"></i>Gateway: ₹{{ tx.gateway_fee_amount|floatformat:2 }} &nbsp;+&nbsp; GST: ₹{{ tx.gateway_gst_amount|floatformat:2 }}
+                    </small>
+                    {% endif %}
+                  </div>
+                {% endif %}
+              </td>
+
+              {# ── Amount ── #}
+              <td style="text-align:right;white-space:nowrap;">
+                <span class="{% if tx.transaction_type == 'credit' %}amt-credit{% else %}amt-debit{% endif %}">
+                  {% if tx.transaction_type == 'credit' %}+{% else %}−{% endif %}₹{{ tx.amount|floatformat:2|intcomma }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# ── Pagination footer ── #}
+      <div id="audit-pagination" style="padding:14px 22px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+        <span id="audit-page-info" style="font-size:.78rem;color:#6b7280;font-weight:500;"></span>
+        <div style="display:flex;gap:8px;">
+          <button id="audit-prev" class="btn btn-sm btn-outline-secondary" style="padding:3px 14px;font-size:.75rem;">‹ Prev</button>
+          <button id="audit-next" class="btn btn-sm btn-outline-secondary" style="padding:3px 14px;font-size:.75rem;">Next ›</button>
+        </div>
+      </div>
+
+      {% else %}
+      <div class="empty-state">
+        <i class="bi bi-journal-x"></i>
+        <p style="font-size:.9rem;font-weight:600;color:#374151;margin-bottom:4px;">No transactions yet</p>
+        <p style="font-size:.8rem;">Transactions will appear here as stores join pools and deliveries are confirmed.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<script>
+(function () {
+  const PER_PAGE = 25;
+  const tbody = document.querySelector('#tbl-audit tbody');
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (!rows.length) { document.getElementById('audit-pagination').style.display = 'none'; return; }
+
+  let page = 1;
+  const total = () => Math.ceil(rows.length / PER_PAGE);
+
+  function render() {
+    const start = (page - 1) * PER_PAGE;
+    rows.forEach((r, i) => r.style.display = (i >= start && i < start + PER_PAGE) ? '' : 'none');
+    document.getElementById('audit-page-info').textContent =
+      `Showing ${start + 1}–${Math.min(start + PER_PAGE, rows.length)} of ${rows.length} entries`;
+    document.getElementById('audit-prev').disabled = page === 1;
+    document.getElementById('audit-next').disabled = page === total();
+    if (total() <= 1) document.getElementById('audit-pagination').style.display = 'none';
+  }
+
+  document.getElementById('audit-prev').onclick = () => { if (page > 1) { page--; render(); window.scrollTo(0,0); } };
+  document.getElementById('audit-next').onclick = () => { if (page < total()) { page++; render(); window.scrollTo(0,0); } };
+  render();
+})();
+</script>
+{% endblock %}

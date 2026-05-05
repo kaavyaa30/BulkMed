@@ -1,0 +1,287 @@
+﻿{% extends 'base.html' %}
+{% block title %}BulkMed — Bulk Medicine Procurement Platform{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ── Landing hero ── */
+  .landing-hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0891b2 100%);
+    border-radius: 24px;
+    padding: 72px 56px;
+    margin-bottom: 48px;
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+  }
+  .landing-hero::before {
+    content: '';
+    position: absolute;
+    top: -60%; right: -5%;
+    width: 500px; height: 500px;
+    background: rgba(255,255,255,.04);
+    border-radius: 50%;
+  }
+  .landing-hero h1 {
+    font-size: 3rem;
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+  }
+  .landing-hero p {
+    font-size: 1.1rem;
+    color: rgba(255,255,255,.8);
+    max-width: 520px;
+    margin-bottom: 0;
+  }
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 99px;
+    padding: 5px 14px;
+    font-size: .78rem;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 20px;
+  }
+
+  /* ── Entry cards ── */
+  .entry-card {
+    border-radius: 20px;
+    padding: 40px 36px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: transform .2s, box-shadow .2s;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+  }
+  .entry-card:hover { transform: translateY(-4px); }
+  .entry-card-store {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    box-shadow: 0 8px 32px rgba(37,99,235,.3);
+    color: #fff;
+  }
+  .entry-card-factory {
+    background: linear-gradient(135deg, #064e3b, #059669);
+    box-shadow: 0 8px 32px rgba(5,150,105,.3);
+    color: #fff;
+  }
+  .entry-card::after {
+    content: '';
+    position: absolute;
+    bottom: -40%; right: -10%;
+    width: 200px; height: 200px;
+    background: rgba(255,255,255,.06);
+    border-radius: 50%;
+  }
+  .entry-icon {
+    font-size: 3rem;
+    margin-bottom: 20px;
+    display: block;
+  }
+  .entry-card h2 {
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -.5px;
+    margin-bottom: 10px;
+    color: #fff;
+  }
+  .entry-card p {
+    font-size: .9rem;
+    color: rgba(255,255,255,.78);
+    flex-grow: 1;
+    margin-bottom: 28px;
+  }
+  .entry-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,.15);
+    border: 1.5px solid rgba(255,255,255,.3);
+    border-radius: 12px;
+    padding: 12px 24px;
+    font-size: .9rem;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    transition: background .15s;
+    align-self: flex-start;
+  }
+  .entry-btn:hover { background: rgba(255,255,255,.25); color: #fff; }
+  .entry-feature {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .82rem;
+    color: rgba(255,255,255,.7);
+    margin-bottom: 8px;
+  }
+  .entry-feature i { color: rgba(255,255,255,.9); }
+
+  /* ── Stats ── */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 48px;
+  }
+  .stat-strip-item {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 20px 22px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .stat-strip-item .sv { font-size: 1.8rem; font-weight: 800; letter-spacing: -1px; }
+  .stat-strip-item .sl { font-size: .75rem; color: #6b7280; font-weight: 500; margin-top: 4px; }
+
+  /* ── How it works ── */
+  .how-card {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 28px 24px;
+    text-align: center;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    height: 100%;
+  }
+  .how-num {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-size: .9rem;
+    font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .how-card h5 { font-size: .95rem; font-weight: 700; color: #111827; margin-bottom: 8px; }
+  .how-card p  { font-size: .82rem; color: #6b7280; margin: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Hero ── -->
+<div class="landing-hero">
+  <div class="row align-items-center position-relative" style="z-index:1;">
+    <div class="col-lg-7">
+      <div class="hero-badge">🚀 India's First B2B Group Buying Platform for Medicines</div>
+      <h1>Buy medicines in bulk.<br>Save more together.</h1>
+      <p>Pool orders with nearby pharmacies, unlock tiered discounts up to 10%, and get direct factory delivery — zero middlemen, zero hassle.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Stats strip ── -->
+<div class="stat-strip">
+  <div class="stat-strip-item">
+    <div class="sv text-primary">{{ stats.verified_stores }}+</div>
+    <div class="sl">Verified Pharmacies</div>
+  </div>
+  <div class="stat-strip-item">
+    <div class="sv" style="color:#059669;">{{ stats.fulfilled_pools }}+</div>
+    <div class="sl">Bulk Orders Delivered</div>
+  </div>
+  <div class="stat-strip-item">
+    <div class="sv" style="color:#d97706;">₹{{ stats.total_commission|floatformat:0 }}+</div>
+    <div class="sl">Platform Revenue</div>
+  </div>
+  <div class="stat-strip-item">
+    <div class="sv" style="color:#7c3aed;">10%</div>
+    <div class="sl">Max Group Discount</div>
+  </div>
+</div>
+
+<!-- ── Two entry cards ── -->
+<div class="row g-4 mb-5">
+
+  <!-- Store card -->
+  <div class="col-md-6">
+    <div class="entry-card entry-card-store">
+      <span class="entry-icon">🏪</span>
+      <h2>For Medical Stores</h2>
+      <p>Join group buying pools with nearby pharmacies. The more stores that join, the bigger the discount — everyone saves together.</p>
+      <div class="mb-4">
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> Up to 10% bulk discount</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> Direct factory delivery</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> AI demand predictions</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> Live delivery tracking</div>
+      </div>
+      <div class="d-flex gap-3 flex-wrap">
+        <a href="{% url 'login' %}?next=/dashboard/" class="entry-btn">
+          <i class="bi bi-box-arrow-in-right"></i> Store Login
+        </a>
+        <a href="{% url 'register' %}?type=store" class="entry-btn" style="background:rgba(255,255,255,.08);">
+          <i class="bi bi-person-plus"></i> Register Store
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Factory card -->
+  <div class="col-md-6">
+    <div class="entry-card entry-card-factory">
+      <span class="entry-icon">🏭</span>
+      <h2>For Factories</h2>
+      <p>Receive consolidated bulk orders from multiple pharmacies in one city. Dispatch once, get paid automatically after delivery confirmation.</p>
+      <div class="mb-4">
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> Consolidated bulk orders</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> 85% payout on delivery</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> OTP-secured payments</div>
+        <div class="entry-feature"><i class="bi bi-check-circle-fill"></i> Order & delivery dashboard</div>
+      </div>
+      <div class="d-flex gap-3 flex-wrap">
+        <a href="{% url 'login' %}?next=/factory/" class="entry-btn">
+          <i class="bi bi-box-arrow-in-right"></i> Factory Login
+        </a>
+        <a href="{% url 'register' %}?type=factory" class="entry-btn" style="background:rgba(255,255,255,.08);">
+          <i class="bi bi-person-plus"></i> Register Factory
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── How it works ── -->
+<div class="mb-2">
+  <div class="section-title"><i class="bi bi-info-circle text-primary"></i> How It Works</div>
+</div>
+<div class="row g-3 mb-5">
+  <div class="col-6 col-md-3">
+    <div class="how-card">
+      <div class="how-num">1</div>
+      <h5>Stores Join a Pool</h5>
+      <p>Multiple pharmacies in the same city join a pool for the same medicine.</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="how-card">
+      <div class="how-num">2</div>
+      <h5>Discount Unlocks</h5>
+      <p>As more stores join, the group discount tier increases for everyone.</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="how-card">
+      <div class="how-num">3</div>
+      <h5>Factory Dispatches</h5>
+      <p>The factory receives one consolidated order and ships directly to each store.</p>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="how-card">
+      <div class="how-num">4</div>
+      <h5>OTP Confirms & Pays</h5>
+      <p>Store confirms delivery via OTP. Factory gets 85% automatically.</p>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
