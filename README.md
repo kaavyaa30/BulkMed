@@ -177,3 +177,37 @@ LOGISTICS_WEBHOOK_TOKEN=         # secret token for 3PL webhook
 DATABASE_URL=                    # leave blank to use SQLite
 REDIS_URL=redis://localhost:6379/0
 ```
+
+```
+## 📸 Visual Tour
+
+### 1. Authentication & Onboarding
+![Home Page](images/Home_Page.png)
+![Register](images/Register.png)
+![Login](images/Login.png)
+
+### 2. Store Module (Pharmacy Side)
+![Store Dashboard](images/Store_Dashboard.png)
+![Pool List](images/Pool_List.png)
+![Pool Detail](images/Pool_Detail.png)
+![AI Predictions](images/AI_Predictions.png)
+![Store Wallet](images/Store_Wallet.png)
+
+### 3. Factory Module (Manufacturing Side)
+![Factory Dashboard](images/Factory_Dashboard.png)
+![Product Management](images/Factory_Product_Management.png)
+![Order Process](images/Factory_Order_Process.png)
+![Order Dispatched](images/Factory_Order_Dispatched.png)
+![Factory Wallet](images/Factory_Wallet.png)
+
+### 4. Logistics & Delivery Tracking
+![Live Tracking Store View](images/Order_Tracking_Live.png)
+![Driver PWA Live Tracking](images/Driver_PWA_Live_Tracking.png)
+
+### 5. SuperAdmin Control & Fintech Ledger
+![Admin Dashboard](images/Admin_Dashboard.png)
+![Admin Control - Stores](images/Admin_Control_Stores.png)
+![Admin Control - Factories](images/Admin_Control_Factories.png)
+![Financial Audit Trail](images/Audit_Trail.png)
+![GST Automated Invoice](images/GST_Automated_Invoice.png)
+```

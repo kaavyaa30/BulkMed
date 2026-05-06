@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
 views.py -- BulkMed Page Controllers
 """
@@ -1180,9 +1180,21 @@ def dashboard(request):
     }
     for inv in low_stock:
         inv.open_pool_id = open_pool_map.get(str(inv.product_id))
+
+    # AI Predictions count = unread PredictionAlerts + low-stock items that have
+    # no alert yet. This ensures the widget shows a non-zero count even when the
+    # daily Celery prediction task hasn't run (e.g., in development without Celery).
+    alerted_product_ids = set(alerts.values_list('product_id', flat=True))
+    low_stock_without_alert = [i for i in low_stock if i.product_id not in alerted_product_ids]
+    ai_prediction_count = alerts.count() + len(low_stock_without_alert)
+
     return render(request, 'core/dashboard.html', {
-        'store': store, 'low_stock': low_stock, 'alerts': alerts,
-        'my_entries': my_entries, 'active_deliveries': active_deliveries,
+        'store':               store,
+        'low_stock':           low_stock,
+        'alerts':              alerts,
+        'ai_prediction_count': ai_prediction_count,
+        'my_entries':          my_entries,
+        'active_deliveries':   active_deliveries,
     })
 
 
