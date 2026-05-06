@@ -178,11 +178,11 @@ DATABASE_URL=                    # leave blank to use SQLite
 REDIS_URL=redis://localhost:6379/0
 ```
 
-```
+
 ## 📸 Visual Tour
 
 ### 1. Authentication & Onboarding
-![Home Page](./images/Home_Page.png)
+![Home_Page](./images/Home_Page.png)
 ![Register](./images/Register.png)
 ![Login](./images/Login.png)
 
@@ -210,4 +210,3 @@ REDIS_URL=redis://localhost:6379/0
 ![Admin Control - Factories](./images/Admin_Control_Factories.png)
 ![Financial Audit Trail](./images/Audit_Trail.png)
 ![GST Automated Invoice](./images/GST_Automated_Invoice.png)
-```
