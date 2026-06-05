@@ -26,6 +26,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # serve static files in production
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -55,11 +56,26 @@ TEMPLATES = [
 WSGI_APPLICATION = 'bulkmed.wsgi.application'
 
 import os
-# Use DATABASE_URL from .env if set, otherwise fall back to SQLite for local dev
+import dj_database_url
+
+# ── Database ──────────────────────────────────────────────────────────────────
+# Reads DATABASE_URL from the environment (set by Vercel / your host).
+# Falls back to SQLite for local development when DATABASE_URL is not set
+# or still contains the placeholder value.
 _db_url = os.environ.get('DATABASE_URL', '')
+
 if _db_url and not _db_url.startswith('postgres://user:password'):
-    DATABASES = {'default': env.db('DATABASE_URL')}
+    # Production / staging: parse the full Postgres URL
+    DATABASES = {
+        'default': dj_database_url.config(
+            default=_db_url,
+            conn_max_age=600,        # keep connections alive for 10 minutes
+            conn_health_checks=True, # drop stale connections automatically
+            ssl_require=True,        # Vercel / Neon / Supabase all require SSL
+        )
+    }
 else:
+    # Local development: SQLite — no configuration needed
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -78,6 +94,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+# WhiteNoise: serve compressed, cached static files in production
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
